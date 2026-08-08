@@ -157,6 +157,17 @@
     box-shadow:0 6px 18px rgba(34,197,94,.4)}
   .ps-chip.playing .ps-num{color:#04331f}.ps-chip.playing .ps-name{color:#0a5236}
   .ps-ctl{display:flex;gap:12px;align-items:center}
+  /* Score Player chord strip — same look as the trainer play-strip */
+  .pl-chips{margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+    background:linear-gradient(180deg,#eef1ff,#e4e8ff);border:1px solid #cdd5ff;border-radius:14px;padding:12px}
+  .pl-chip{flex:1 1 0;min-width:90px;max-width:200px;background:linear-gradient(180deg,#5b6ee1,#4453c9);border:2px solid #4453c9;
+    border-radius:12px;padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    box-shadow:0 4px 12px rgba(68,83,201,.25);transition:transform .1s,background .1s}
+  .pl-chip .pl-num{font-size:26px;font-weight:900;color:#fff;line-height:1}
+  .pl-chip .pl-name{font-size:14px;font-weight:800;color:#d3d9ff}
+  .pl-chip.playing{background:linear-gradient(180deg,#3ee08f,#22c55e);border-color:#22c55e;transform:translateY(-3px);
+    box-shadow:0 6px 18px rgba(34,197,94,.4)}
+  .pl-chip.playing .pl-num{color:#04331f}.pl-chip.playing .pl-name{color:#0a5236}
   .ps-ctl .action.primary{font-size:16px;padding:12px 26px}
   .kbtip{text-align:center;color:var(--muted);font-size:13px;margin-top:10px}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px;justify-content:center}
@@ -164,13 +175,14 @@
   .sw{width:15px;height:15px;border-radius:4px;display:inline-block}
 
   /* Technique cards */
-  .tech-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
-  .tech{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;transition:.12s}
+  .tech-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .tech{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;transition:.12s}
   .tech:hover{border-color:var(--indigo)}
   .tech.on{border-color:var(--indigo);background:#e9ecfd;box-shadow:0 0 0 1px var(--indigo) inset}
-  .tech .tt{font-weight:800;font-size:14px;margin-bottom:3px}
-  .tech .td{font-size:11.5px;color:var(--muted);line-height:1.35}
-  .tech .tp{margin-top:8px;font-size:12px;font-weight:800;color:var(--indigo)}
+  .tech .tt{font-weight:800;font-size:13px;margin-bottom:3px}
+  .tech .td{font-size:11px;color:var(--muted);line-height:1.3}
+  .tech .tp{margin-top:8px;font-size:11.5px;font-weight:800;color:var(--indigo)}
+  @media(max-width:900px){.tech-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}}
 
   /* Sheet */
   .sheet-row{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start}
@@ -554,6 +566,8 @@
         <span class="midi-status wait" id="pianoStatus">Loading grand piano…</span>
       </div>
       <div class="waterfall-wrap"><canvas id="pcanvas"></canvas></div>
+      <!-- chord strip: shows the sent progression, highlights the chord playing now -->
+      <div class="pl-chips" id="plChips" style="display:none"></div>
       <!-- transport bar sits BELOW the keyboard, like a video player -->
       <div class="player-controls" style="margin-top:12px">
         <div class="transport">
@@ -932,6 +946,10 @@ function sendToWaterfall(){
   player.loop=true;const lp=$('plLoop');if(lp)lp.checked=true;player.seamless=true;
   // carry the Trainer's time signature + tempo so the player metronome matches
   player.metroBeats=state.beats||4;player.metroBeat=60/(state.bpm||100);
+  // chord strip: one chip per chord in the progression, each lasting one bar
+  const barLen=duration/state.progression.length;
+  player.chordStrip=state.progression.map((d,i)=>({num:chords[d]?chords[d].numLabel:'?',name:chords[d]?chords[d].name:'',start:i*barLen,end:(i+1)*barLen}));
+  renderPlayerChips();
   const pt=document.querySelector('.tab[data-tab="player"]');if(pt)pt.click();
   toast('Sent to Score Player — press ▶ to play the waterfall.');
 }
@@ -1806,6 +1824,8 @@ const player={
   metroBeat:60/100,// seconds per beat at 100%, captured at send time
   metroScheduled:0,// beat index up to which we've scheduled clicks
   seamless:false,  // seamless (gapless) loop for progression arrangements
+  chordStrip:[],   // [{num,name,start,end}] chord chips shown below the waterfall (progressions only)
+  _chipIdx:-1,     // which chip is currently highlighted
   scheduled:0,     // index up to which we've scheduled audio
   MIDI_LO:21,MIDI_HI:108, // full 88-key range A0..C8
   resize(){const c=$('pcanvas');if(!c)return;const w=c.clientWidth||c.parentElement.clientWidth;const dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=516*dpr;const ctx=c.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);this._w=w;this._h=516;},
@@ -2018,6 +2038,7 @@ function finishLoad(notes,title,fname,durOverride){
   player.duration=durOverride||d+0.5;
   player.playing=false;player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();
   player.seamless=false; // only progression arrangements opt into seamless looping
+  player.chordStrip=[];player._chipIdx=-1;renderPlayerChips(); // sendToWaterfall repopulates for progressions
   computeBassChanges();
   const nR=notes.filter(n=>n.hand==='R').length,nL=notes.length-nR;
   $('songinfo').innerHTML=`<b>${title||fname}</b> — ${notes.length} notes (${nR} RH / ${nL} LH), ${fmtTime(player.duration)}. Ready.`;
@@ -2027,6 +2048,31 @@ function finishLoad(notes,title,fname,durOverride){
   player.resize();player.draw();
 }
 const fmtTime=s=>{s=Math.max(0,s);const m=Math.floor(s/60),ss=Math.floor(s%60);return m+':'+String(ss).padStart(2,'0');};
+
+// ---- Score Player chord strip (progressions only) ----
+function renderPlayerChips(){
+  const box=$('plChips');if(!box)return;
+  if(!player.chordStrip.length){box.style.display='none';box.innerHTML='';player._chipIdx=-1;return;}
+  box.style.display='flex';
+  box.innerHTML=player.chordStrip.map((c,i)=>`<div class="pl-chip" data-idx="${i}"><div class="pl-num">${c.num}</div><div class="pl-name">${c.name}</div></div>`).join('');
+  // tap a chip to jump the playhead to that chord
+  box.querySelectorAll('.pl-chip').forEach(ch=>ch.addEventListener('click',()=>{
+    const c=player.chordStrip[+ch.dataset.idx];if(!c)return;
+    player.posAtStart=c.start;player.scheduled=0;player.metroScheduled=0;player._cursorIdx=undefined;player._sheetScroll=null;
+    if(player.playing){player.startCtxTime=audio().currentTime;}
+    updateCursor(c.start);player.draw();updateSeek();updatePlayerChips(c.start);
+  }));
+  player._chipIdx=-1;updatePlayerChips(playerPos());
+}
+function updatePlayerChips(pos){
+  const strip=player.chordStrip;if(!strip.length)return;
+  // pos is already wrapped into [0,duration) by the loop; find the chord bar it falls in
+  let idx=-1;for(let i=0;i<strip.length;i++){if(pos>=strip[i].start&&pos<strip[i].end){idx=i;break;}}
+  if(idx===player._chipIdx)return;
+  player._chipIdx=idx;
+  const kids=$('plChips').children;
+  for(let i=0;i<kids.length;i++)kids[i].classList.toggle('playing',i===idx);
+}
 
 /* ---- playback clock ---- */
 function playerPos(){ // current song seconds
@@ -2043,7 +2089,7 @@ function plPlay(){
   cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
 }
 function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();}
-function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);player.draw();updateSeek();}
+function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
 function clearLitAll(){for(let m=KB_LO;m<=KB_HI;m++)litOff(m);}
 
 function playerLoop(){
@@ -2066,6 +2112,7 @@ function playerLoop(){
   scheduleAudio(pos);
   updateLitKeys(pos);
   updateCursor(pos);
+  if(player.chordStrip.length)updatePlayerChips(player.duration?pos%player.duration:pos);
   player.draw();updateSeek();
   if(pos>=player.duration){
     if(player.loop&&player.seamless&&!player.wait){
@@ -2249,7 +2296,7 @@ function wirePlayer(){
   setupPlayerIO();
   $('plPlay').addEventListener('click',plPlayPause);
   $('plRestart').addEventListener('click',plRestart);
-  $('plSeek').addEventListener('input',e=>{player.posAtStart=(+e.target.value/1000)*player.duration;player.scheduled=0;player.metroScheduled=0;if(player.playing){player.startCtxTime=audio().currentTime;}player._cursorIdx=undefined;player._sheetScroll=null;updateCursor(player.posAtStart);player.draw();$('plTime').textContent=fmtTime(player.posAtStart);});
+  $('plSeek').addEventListener('input',e=>{player.posAtStart=(+e.target.value/1000)*player.duration;player.scheduled=0;player.metroScheduled=0;if(player.playing){player.startCtxTime=audio().currentTime;}player._cursorIdx=undefined;player._sheetScroll=null;updateCursor(player.posAtStart);player.draw();updatePlayerChips(player.posAtStart);$('plTime').textContent=fmtTime(player.posAtStart);});
   $('plTempo').addEventListener('input',e=>{const v=+e.target.value;$('plTempoVal').textContent=v+'%';const wasPos=playerPos();player.rate=v/100;player.posAtStart=wasPos;if(player.playing)player.startCtxTime=audio().currentTime;});
   $('plSound').addEventListener('change',e=>{player.sound=e.target.checked;player.scheduled=player.notes.findIndex(n=>n.start>=playerPos());if(player.scheduled<0)player.scheduled=player.notes.length;});
   $('plRH').addEventListener('change',e=>{player.showRH=e.target.checked;player.draw();});
