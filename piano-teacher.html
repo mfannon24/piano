@@ -903,7 +903,11 @@ function arrange(prog,style,motion,level){
   const beat=60/(state.bpm||100);
   const barLen=Math.max(0.6,(state.beatsPerChord||4)*beat);
   const steps=climbSteps(level), order=['chords','arpeggio','broken'];
-  const notes=[];let t=0,bar=0;
+  // Smooth = fewest-finger-movement voice-leading (the Trainer's ✨ Smooth toggle).
+  // It's the opposite of roaming (which deliberately walks up/down), so it only
+  // applies to static motion — the case where root position "doesn't flow".
+  const useSmooth=state.smooth&&motion!=='roaming';
+  const notes=[];let t=0,bar=0,prevTones=null;
   prog.forEach((d,pi)=>{
     const c=chords[d];if(!c)return;
     const st=style==='all'?order[pi%3]:style;
@@ -911,9 +915,15 @@ function arrange(prog,style,motion,level){
     const lhRoot=pcInOctave(c.rootPc,40);
     const bass=bassNotes(c,lhRoot,level,barLen);
     const lhTop=Math.max(...bass.map(b=>b.m));
-    // RIGHT HAND — close triad near C4; static holds position, roaming climbs
-    let tones=tonesFrom(c,pcInOctave(c.rootPc,57));
-    if(motion==='roaming')tones=climbTones(tones,steps[bar%steps.length]);
+    // RIGHT HAND voicing:
+    //   roaming → climb/invert up the keyboard and gently back down
+    //   smooth  → voice-lead from the previous chord (fewest finger moves)
+    //   else    → root position near C4
+    let tones;
+    if(motion==='roaming')      tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
+    else if(useSmooth)          tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    else                        tones=tonesFrom(c,pcInOctave(c.rootPc,57));
+    prevTones=tones;            // voice-lead the NEXT chord toward this (pre-fit) voicing
     let fig=fitBlock(rhFigure(tones,st,level,barLen),lhTop);
     // emit (final on-keyboard guard is a no-op given fitBlock, but keeps us safe)
     bass.forEach(b=>{if(b.m>=KB_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t+b.s,t+b.e,'L',b.nm||null));});
@@ -939,7 +949,8 @@ function sendToWaterfall(){
   player.osmd=null;player.osmdReady=false;player.cursorAnchors=[];
   $('sheetFollowPanel').style.display='none';
   const nums=state.progression.map(d=>chords[d]?chords[d].numLabel:'?').join(' ');
-  const modeLbl=`${STYLE_LBL[arrStyle]} · ${arrMotion==='roaming'?'Roaming':'Static'}`;
+  const motionLbl=arrMotion==='roaming'?'Roaming':(state.smooth?'Smooth':'Static');
+  const modeLbl=`${STYLE_LBL[arrStyle]} · ${motionLbl}`;
   const lvlLbl=arrangeLevel[0].toUpperCase()+arrangeLevel.slice(1);
   // pass the EXACT bar-quantized duration so looping wraps seamlessly (no +0.5 pad)
   finishLoad(notes,`${modeLbl} · ${lvlLbl} — ${nums} (${noteStr(parseNote(state.keyRoot))})`,'progression',duration);
@@ -1199,7 +1210,8 @@ const SONGS={
    ========================================================= */
 const state={keyRoot:'C',type:'major',degree:0,seventh:false,inversion:0,technique:'block',
   scaleOn:false,chordOn:true,bassOn:false,sheetOn:false,smooth:false,hand:'right',
-  progression:[],loop:false,bpm:100,beats:4,beatsPerChord:4,drum:'none'};
+  progression:[],loop:false,bpm:100,beats:4,beatsPerChord:4,drum:'none',
+  progViewIdx:-1};   // which progression slot is being viewed (for smooth voice-leading on the keyboard); -1 = not a slot
 let scale=null,chords=[],keyEls={};
 const $=id=>document.getElementById(id);
 
@@ -1294,9 +1306,24 @@ function render(){
   saveURL();
 }
 function currentChord(){return chords[state.degree]||null;}
-// Static keyboard display: always the plain chord tones. Smooth is a playback-only
-// mode (fewest finger moves across a progression), so it shows root position here.
-function chordMidis(){const c=currentChord();if(!c)return[];return fitKeyboard(invert(c.midis,state.smooth?0:state.inversion));}
+// The chord voicing shown on the keyboard.
+//   smooth + viewing a progression slot → voice-led from the previous chord in the
+//     progression (chain smoothVoicing from the start up to this slot), so the display
+//     matches how it actually flows — not a jump to root position.
+//   smooth, standalone chord → root position centered near middle C.
+//   else → the selected inversion.
+function chordMidis(){
+  const c=currentChord();if(!c)return[];
+  if(state.smooth){
+    if(state.progViewIdx>=0&&state.progViewIdx<state.progression.length){
+      let prev=null,v=null;
+      for(let i=0;i<=state.progViewIdx;i++){const cc=chords[state.progression[i]];if(!cc)continue;v=smoothVoicing(cc.midis,prev);prev=v;}
+      if(v)return fitKeyboard(v.slice().sort((a,b)=>a-b));
+    }
+    return fitKeyboard(smoothVoicing(c.midis,null).slice().sort((a,b)=>a-b));
+  }
+  return fitKeyboard(invert(c.midis,state.inversion));
+}
 // keep a voicing on the visible keyboard: shift by whole octaves if it runs off either end
 function fitKeyboard(v){let a=[...v];while(Math.max(...a)>KB_HI)a=a.map(m=>m-12);while(Math.min(...a)<KB_LO)a=a.map(m=>m+12);return a;}
 // the chord notes actually drawn on the keyboard right now (live playback voicing if a
@@ -1414,7 +1441,7 @@ function renderProg(){
   if(!state.progression.length){box.innerHTML='<span class="empty-hint">Tap numbers, a preset, or a song…</span>';renderPlayStrip();return;}
   box.innerHTML=state.progression.map((d,idx)=>{const c=chords[d];if(!c)return'';return `<div class="prog-chip" data-idx="${idx}"><button class="x" data-idx="${idx}">×</button><div class="pr">${c.numLabel}</div><div class="pn">${c.name}</div></div>`;}).join('');
   box.querySelectorAll('.x').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();state.progression.splice(+x.dataset.idx,1);renderProg();saveURL();}));
-  box.querySelectorAll('.prog-chip').forEach(ch=>ch.addEventListener('click',()=>{if(progPlaying)return;livePlay=null;const d=state.progression[+ch.dataset.idx];state.degree=d;state.inversion=0;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);}));
+  box.querySelectorAll('.prog-chip').forEach(ch=>ch.addEventListener('click',()=>{if(progPlaying)return;livePlay=null;const idx=+ch.dataset.idx;const d=state.progression[idx];state.degree=d;state.inversion=0;state.progViewIdx=idx;syncInv();render();const c=currentChord();if(c)playVoicingTech(chordMidis(),state.technique,1.6);}));
   renderPlayStrip();
 }
 // Big, bold strip directly under the keyboard — the chords you actually read while playing.
@@ -1424,7 +1451,7 @@ function renderPlayStrip(){
   strip.style.display='flex';
   box.innerHTML=state.progression.map((d,idx)=>{const c=chords[d];if(!c)return'';
     return `<div class="ps-chip${progPlaying&&livePlay&&idx===psActiveIdx?' playing':''}" data-idx="${idx}"><div class="ps-num">${c.numLabel}</div><div class="ps-name">${c.name}</div></div>`;}).join('');
-  box.querySelectorAll('.ps-chip').forEach(ch=>ch.addEventListener('click',()=>{if(progPlaying)return;livePlay=null;const d=state.progression[+ch.dataset.idx];state.degree=d;state.inversion=0;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);}));
+  box.querySelectorAll('.ps-chip').forEach(ch=>ch.addEventListener('click',()=>{if(progPlaying)return;livePlay=null;const idx=+ch.dataset.idx;const d=state.progression[idx];state.degree=d;state.inversion=0;state.progViewIdx=idx;syncInv();render();const c=currentChord();if(c)playVoicingTech(chordMidis(),state.technique,1.6);}));
 }
 let psActiveIdx=-1;
 
@@ -1711,13 +1738,13 @@ function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show')
 /* =========================================================
    WIRE UP
    ========================================================= */
-$('keySel').addEventListener('change',e=>{state.keyRoot=e.target.value;state.degree=0;render();});
-$('chordSel').addEventListener('change',e=>{state.degree=+e.target.value;state.inversion=0;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);});
-$('numSel').addEventListener('change',e=>{state.degree=+e.target.value;state.inversion=0;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);});
-$('hearBtn').addEventListener('click',()=>{const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.7);});
+$('keySel').addEventListener('change',e=>{state.keyRoot=e.target.value;state.degree=0;state.progViewIdx=-1;render();});
+$('chordSel').addEventListener('change',e=>{state.degree=+e.target.value;state.inversion=0;state.progViewIdx=-1;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);});
+$('numSel').addEventListener('change',e=>{state.degree=+e.target.value;state.inversion=0;state.progViewIdx=-1;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.6);});
+$('hearBtn').addEventListener('click',()=>{const c=currentChord();if(c){state.smooth?playVoicingTech(chordMidis(),state.technique,1.7):playChordTech(c.midis,state.technique,state.inversion,1.7);}});
 $('transUp').addEventListener('click',()=>transpose(1));
 $('transDown').addEventListener('click',()=>transpose(-1));
-$('invRow').querySelectorAll('button[data-inv]').forEach(b=>b.addEventListener('click',()=>{state.inversion=+b.dataset.inv;state.smooth=false;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.4);}));
+$('invRow').querySelectorAll('button[data-inv]').forEach(b=>b.addEventListener('click',()=>{state.inversion=+b.dataset.inv;state.smooth=false;state.progViewIdx=-1;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.4);}));
 $('smoothBtn').addEventListener('click',()=>{state.smooth=!state.smooth;syncInv();render();if(state.smooth)toast('Smooth on — play the progression; green keys are fingers you keep planted into the next chord');const c=currentChord();if(c)playChordTech(c.midis,state.technique,0,1.4);});
 $('seventhBtn').addEventListener('click',()=>{state.seventh=!state.seventh;state.inversion=0;syncInv();render();const c=currentChord();if(c)playChordTech(c.midis,state.technique,state.inversion,1.4);});
 
