@@ -18,8 +18,8 @@
     /* Soft Studio Light */
     --bg:#eef1f6; --panel:#ffffff; --panel2:#f4f6fb; --line:#dde3ee;
     --text:#1f2333; --muted:#6b7488;
-    --indigo:#5b6ee1; --indigo-d:#4453c9; --gold:#f0a500; --green:#23c48a; --pink:#e0576f;
-    --scale:#f0a500; --chord:#5b6ee1;
+    --indigo:#5b6ee1; --indigo-d:#4453c9; --gold:#fbbf24; --green:#23c48a; --pink:#e0576f;
+    --scale:#fbbf24; --chord:#38bdf8;
     --shadow:0 6px 20px rgba(40,52,90,.10);
     --shadow-sm:0 2px 8px rgba(40,52,90,.08);
   }
@@ -112,19 +112,19 @@
   .kb-wrap{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;padding:4px 2px}
   .keyboard{position:relative;height:274px;margin:0 auto;min-width:640px}
   .key{position:absolute;top:64px;border-radius:0 0 8px 8px;cursor:pointer;overflow:visible}
-  .key.white{background:linear-gradient(180deg,#ffffff,#eef1f7);border:1px solid #c9d1e0;height:200px;z-index:1;box-shadow:inset 0 -4px 0 rgba(60,72,110,.06)}
-  .key.black{background:linear-gradient(180deg,#3a4152,#1a1e2a);border:1px solid #12151d;height:122px;z-index:3;box-shadow:0 5px 8px rgba(30,40,70,.4)}
+  .key.white{background:linear-gradient(180deg,#e2e6ef,#d4d9e4);border:1px solid #b7bfd0;height:200px;z-index:1;box-shadow:inset 0 -4px 0 rgba(60,72,110,.08)}
+  .key.black{background:linear-gradient(180deg,#b8bfcf,#aeb4c4);border:1px solid #9098aa;height:122px;z-index:3;box-shadow:0 4px 7px rgba(30,40,70,.25)}
   .key.pressed{filter:brightness(.9)}
-  .key.white.in-scale{background:linear-gradient(180deg,#fdf0cf,#f7d987);border-color:#e6bd5c}
-  .key.black.in-scale{background:linear-gradient(180deg,#e6be5f,#a9822c)}
-  .key.white.in-chord{background:linear-gradient(180deg,#dfe4ff,#96a4f2)!important;border-color:#6172dd!important}
-  .key.black.in-chord{background:linear-gradient(180deg,#8f9ef0,#4453c9)!important}
+  .key.white.in-scale{background:linear-gradient(180deg,#fef1d0,#fcd34d);border-color:#f0b429}
+  .key.black.in-scale{background:linear-gradient(180deg,#fcd34d,#d69e1e)}
+  .key.white.in-chord{background:linear-gradient(180deg,#d6f0ff,#7dd3fc)!important;border-color:#38bdf8!important}
+  .key.black.in-chord{background:linear-gradient(180deg,#7dd3fc,#0ea5e9)!important}
   .key.bassnote.white{box-shadow:inset 0 0 0 3px var(--gold)}
   .key.bassnote.black{box-shadow:inset 0 0 0 3px var(--gold),0 5px 8px rgba(30,40,70,.4)}
   .key.lit.white{background:linear-gradient(180deg,#c9f7e6,#4ade80)!important;border-color:#22c55e!important}
   .key.lit.black{background:linear-gradient(180deg,#4ade80,#15803d)!important}
   .klbl{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;font-weight:800;pointer-events:none;opacity:0}
-  .key.white .klbl{color:#55607a} .key.black .klbl{color:#e7ecf7}
+  .key.white .klbl{color:#55607a} .key.black .klbl{color:#2a3042}
   .key.in-scale .klbl,.key.in-chord .klbl{opacity:1}
   .kdeg{display:block;font-size:9px;opacity:.75;font-weight:700}
   .rmark{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:10px;font-weight:900;color:#1a2050;opacity:0}
@@ -395,9 +395,9 @@
     <div class="kb-wrap"><div class="keyboard" id="keyboard"></div></div>
     <p class="kbtip">🎵 Tap or click keys to hear them · scroll if the keyboard runs off screen</p>
     <div class="legend">
-      <span><i class="sw" style="background:#f7d987"></i>Scale of <b id="legKey" style="color:#a97400;margin:0 3px">C</b> (1–7)</span>
-      <span><i class="sw" style="background:#96a4f2"></i>Chord — <b style="margin:0 3px">number = finger</b> (1=thumb…5=pinky)</span>
-      <span><i class="sw" style="border:2px solid #f0a500;background:transparent"></i>Bass note</span>
+      <span><i class="sw" style="background:#fcd34d"></i>Scale of <b id="legKey" style="color:#b7791f;margin:0 3px">C</b> (1–7)</span>
+      <span><i class="sw" style="background:#7dd3fc"></i>Chord — <b style="margin:0 3px">number = finger</b> (1=thumb…5=pinky)</span>
+      <span><i class="sw" style="border:2px solid #fbbf24;background:transparent"></i>Bass note</span>
       <span><i class="sw" style="background:#4ade80"></i>You / playing</span>
     </div>
     <!-- Big play-strip: the progression you actually read while playing, right under the keys -->
@@ -414,8 +414,8 @@
   <div class="panel" id="arrPreviewPanel" style="display:none">
     <h2>Preview <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— how this progression looks in the Score Player (before you play it)</span></h2>
     <div class="arrprev-legend">
-      <span><i class="sw" style="background:#5b8cff"></i>Right hand</span>
-      <span><i class="sw" style="background:#f0a500"></i>Left hand (bass)</span>
+      <span><i class="sw" style="background:#38bdf8"></i>Right hand</span>
+      <span><i class="sw" style="background:#22c3d6"></i>Left hand (bass)</span>
       <span class="muted" id="arrPrevMode" style="margin-left:auto"></span>
     </div>
     <div class="arrprev-wrap"><canvas id="arrPreview"></canvas></div>
@@ -578,8 +578,8 @@
     <div class="panel" id="playerPanel" style="display:none">
       <div class="player-controls">
         <label class="chk"><input type="checkbox" id="plSound" checked><span class="sw" style="background:var(--green)"></span>Play sound</label>
-        <label class="chk"><input type="checkbox" id="plRH" checked><span class="sw" style="background:var(--indigo)"></span>Right hand</label>
-        <label class="chk"><input type="checkbox" id="plLH" checked><span class="sw" style="background:var(--gold)"></span>Left hand</label>
+        <label class="chk"><input type="checkbox" id="plRH" checked><span class="sw" style="background:#38bdf8"></span>Right hand</label>
+        <label class="chk"><input type="checkbox" id="plLH" checked><span class="sw" style="background:#22c3d6"></span>Left hand</label>
         <label class="chk"><input type="checkbox" id="plLoop"><span>🔁</span>Loop</label>
         <label class="chk"><input type="checkbox" id="plMetro"><span>🥁</span>Metronome</label>
         <label class="chk"><input type="checkbox" id="plNames"><span>🔤</span>Note names</label>
@@ -1079,25 +1079,39 @@ function renderArrPreview(){
     ctx.fillText(c.numLabel,8,yTopBar+25);
   }
   // falling notes
-  const RH='#5b8cff',RHb='#3a63d8',LH='#f0a500',LHb='#c98a00';
   arr.notes.forEach(n=>{
     const k=layout[n.midi];if(!k)return;
     const yBot=yForTime(n.start), yTop=yForTime(n.end);
     const rx=k.x+1.5,rw=Math.max(3,k.w-3),ry=Math.min(yTop,yBot),rh=Math.max(5,Math.abs(yBot-yTop));
-    ctx.fillStyle=n.hand==='R'?RH:LH;
-    prRound(ctx,rx,ry,rw,rh,4);ctx.fill();
-    ctx.strokeStyle=n.hand==='R'?RHb:LHb;ctx.lineWidth=1;ctx.stroke();
+    const col=noteFill(ctx,n.hand,k.black,ry,ry+rh);
+    prRound(ctx,rx,ry,rw,rh,4);ctx.fillStyle=col.grad;ctx.fill();
+    ctx.strokeStyle=col.border;ctx.lineWidth=1;ctx.stroke();
   });
-  // mini keyboard along the bottom, same look as the Score Player
+  // mini keyboard along the bottom — same vertical shading as the trainer keys
   for(const m in layout){if(layout[m].black)continue;const k=layout[m];
-    ctx.fillStyle='#f4f6fb';ctx.fillRect(k.x,fallH,k.w-1,kbH);
-    ctx.strokeStyle='#3a4152';ctx.strokeRect(k.x,fallH,k.w-1,kbH);
+    const g=ctx.createLinearGradient(0,fallH,0,fallH+kbH);g.addColorStop(0,'#e2e6ef');g.addColorStop(1,'#d4d9e4');
+    ctx.fillStyle=g;ctx.fillRect(k.x,fallH,k.w-1,kbH);
+    ctx.strokeStyle='#b7bfd0';ctx.strokeRect(k.x,fallH,k.w-1,kbH);
   }
-  for(const m in layout){if(!layout[m].black)continue;const k=layout[m];
-    ctx.fillStyle='#1a1e2a';ctx.fillRect(k.x,fallH,k.w,kbH*0.62);
+  for(const m in layout){if(!layout[m].black)continue;const k=layout[m];const bh=kbH*0.62;
+    const g=ctx.createLinearGradient(0,fallH,0,fallH+bh);g.addColorStop(0,'#b8bfcf');g.addColorStop(1,'#aeb4c4');
+    ctx.fillStyle=g;ctx.fillRect(k.x,fallH,k.w,bh);
+    ctx.strokeStyle='#9098aa';ctx.strokeRect(k.x,fallH,k.w,bh);
   }
 }
 function prRound(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+// Falling-note / preview color, keyed by hand + whether it lands on a black key.
+// White key = the lighter shade, black key = the darker shade — so the bar and the
+// key it lights up always match. Returns a top-light → bottom-dark gradient for depth.
+const NOTE_COLORS={
+  R:{white:{top:'#5aa0ff',bot:'#38bdf8',border:'#0284c7'},black:{top:'#2a8fd4',bot:'#0e7fc0',border:'#0a5f92'}},
+  L:{white:{top:'#3ad6e6',bot:'#22c3d6',border:'#0e9aab'},black:{top:'#1cadbe',bot:'#0e97a8',border:'#0a7482'}}
+};
+function noteFill(ctx,hand,isBlack,yTop,yBot){
+  const c=NOTE_COLORS[hand==='R'?'R':'L'][isBlack?'black':'white'];
+  const g=ctx.createLinearGradient(0,yTop,0,yBot);g.addColorStop(0,c.top);g.addColorStop(1,c.bot);
+  return {grad:g,border:c.border};
+}
 
 /* =========================================================
    AUDIO
@@ -2402,8 +2416,9 @@ player.draw=function(){
   for(let m=player.MIDI_LO;m<=player.MIDI_HI;m++){if(m%12===0&&layout[m]){ctx.beginPath();ctx.moveTo(layout[m].x,0);ctx.lineTo(layout[m].x,fallH);ctx.stroke();}}
   // hit line
   ctx.fillStyle='rgba(255,255,255,0.15)';ctx.fillRect(0,fallH-2,W,2);
-  // falling notes: y maps time; note.start hitting the line (fallH) at pos
-  const RH='#5b8cff',RHb='#3a63d8',LH='#f0a500',LHb='#c98a00';
+  // falling notes: y maps time; note.start hitting the line (fallH) at pos.
+  // Color is keyed by hand + whether the note lands on a black key — the SAME shade
+  // whether it's falling or landed, so the bar and the lit key always match.
   const drawNote=(n,off)=>{
     if(!handOn(n))return;
     const k=layout[n.midi];if(!k)return;
@@ -2411,11 +2426,10 @@ player.draw=function(){
     if(tBot< -0.15 || tTop>secondsVisible)return;
     const yBottom=fallH - (tTop/secondsVisible)*fallH; // where note head is
     const yTop=fallH - (tBot/secondsVisible)*fallH;
-    const active=(n.start+off)<=pos&&(n.end+off)>pos;
-    ctx.fillStyle=n.hand==='R'?(active?'#9ab6ff':RH):(active?'#ffcb57':LH);
     const rx=k.x+1.5,rw=Math.max(3,k.w-3),ry=Math.min(yTop,yBottom),rh=Math.max(5,Math.abs(yBottom-yTop));
-    roundRect(ctx,rx,ry,rw,rh,4);ctx.fill();
-    ctx.strokeStyle=n.hand==='R'?RHb:LHb;ctx.lineWidth=1;ctx.stroke();
+    const col=noteFill(ctx,n.hand,k.black,ry,ry+rh);
+    roundRect(ctx,rx,ry,rw,rh,4);ctx.fillStyle=col.grad;ctx.fill();
+    ctx.strokeStyle=col.border;ctx.lineWidth=1;ctx.stroke();
   };
   player.notes.forEach(n=>drawNote(n,0));
   // On a seamless loop, also render the NEXT iteration (offset by one loop length)
@@ -2430,24 +2444,27 @@ function drawMiniKeys(ctx,layout,ww,bw,y0,kbH,pos,labelH,W){
   const active={};player.notes.forEach(n=>{if(handOn(n)&&n.start<=pos&&n.end>pos)active[n.midi]=n;});
   // label-lane background under the keys
   if(labelH){ctx.fillStyle='#0d1017';ctx.fillRect(0,y0+kbH,W,labelH);}
-  // whites
+  // whites — vertical shading like the trainer keys. Lit key uses the SAME shade
+  // as its falling note (white-key variant) so the bar and the key always match.
   for(const m in layout){if(layout[m].black)continue;const k=layout[m];const an=active[m];
-    ctx.fillStyle=an?(an.hand==='R'?'#9ab6ff':'#ffcb57'):'#f4f6fb';
-    ctx.fillRect(k.x,y0,k.w-1,kbH);ctx.strokeStyle='#3a4152';ctx.strokeRect(k.x,y0,k.w-1,kbH);
+    if(an){ctx.fillStyle=NOTE_COLORS[an.hand==='R'?'R':'L'].white.bot;}
+    else{const g=ctx.createLinearGradient(0,y0,0,y0+kbH);g.addColorStop(0,'#e2e6ef');g.addColorStop(1,'#d4d9e4');ctx.fillStyle=g;}
+    ctx.fillRect(k.x,y0,k.w-1,kbH);ctx.strokeStyle='#b7bfd0';ctx.strokeRect(k.x,y0,k.w-1,kbH);
   }
-  // blacks on top
-  for(const m in layout){if(!layout[m].black)continue;const k=layout[m];const an=active[m];
-    ctx.fillStyle=an?(an.hand==='R'?'#3a63d8':'#c98a00'):'#1a1e2a';
-    ctx.fillRect(k.x,y0,k.w,kbH*0.62);
+  // blacks on top — lit key uses the black-key (darker) variant
+  for(const m in layout){if(!layout[m].black)continue;const k=layout[m];const an=active[m];const bh=kbH*0.62;
+    if(an){ctx.fillStyle=NOTE_COLORS[an.hand==='R'?'R':'L'].black.bot;}
+    else{const g=ctx.createLinearGradient(0,y0,0,y0+bh);g.addColorStop(0,'#b8bfcf');g.addColorStop(1,'#aeb4c4');ctx.fillStyle=g;}
+    ctx.fillRect(k.x,y0,k.w,bh);ctx.strokeStyle='#9098aa';ctx.strokeRect(k.x,y0,k.w,bh);
   }
   // note-name readout: a rounded box under each currently-playing key (like the trainer)
   if(labelH&&player.showNames){
     const ly=y0+kbH+4, lh=labelH-8;
     for(const m in active){const k=layout[m];if(!k)continue;const an=active[m];
       const cx=k.x+(k.black?k.w/2:k.w/2), bw2=Math.max(20,(k.black?bw:ww)-4), bx=cx-bw2/2;
-      ctx.fillStyle=an.hand==='R'?'#c9d8ff':'#ffe6ad';
+      ctx.fillStyle=an.hand==='R'?'#d6f0ff':'#d4f6fa';
       roundRect(ctx,bx,ly,bw2,lh,6);ctx.fill();
-      ctx.strokeStyle=an.hand==='R'?'#3a63d8':'#c98a00';ctx.lineWidth=1.5;ctx.stroke();
+      ctx.strokeStyle=an.hand==='R'?'#0284c7':'#0e9aab';ctx.lineWidth=1.5;ctx.stroke();
       ctx.fillStyle='#12151f';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText(CHROMA_SHARP[((+m%12)+12)%12],cx,ly+lh/2+0.5);
     }
