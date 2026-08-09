@@ -377,6 +377,31 @@
     </div>
   </div>
 
+    <!-- ===== PROGRESSION ===== -->
+    <div class="panel collapsible" id="progPanel">
+      <h2 data-collapse>Build a Progression (Number Pattern)</h2>
+      <div class="collapse-body">
+        <p class="muted" style="margin:2px 0 10px">Tap numbers to stack them, grab a preset, or load a real song below.</p>
+        <div class="deg-btns" id="degBtns"></div>
+        <div class="presets" id="presets"></div>
+        <details class="subcollapse" id="songLibDetails">
+          <summary>🎵 Song library</summary>
+          <div class="songbtns" id="songbtns" style="margin-top:10px"></div>
+        </details>
+        <div class="prog-chips" id="progChips" style="margin-top:12px"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="action primary" id="playProgBtn">▶ Play</button>
+          <button class="action" id="clearProgBtn">Clear</button>
+          <div class="pill blue" id="loopPill" style="padding:8px 14px"><span class="ind"></span>Loop <span class="st">Off</span></div>
+          <div class="ctl"><label>Beats / chord</label>
+            <select id="bpcSel"><option>1</option><option>2</option><option selected>4</option></select>
+          </div>
+          <button class="action" id="shareBtn">🔗 Copy link</button>
+        </div>
+      </div>
+    </div>
+
+
   <!-- ===== TOGGLES + KEYBOARD ===== -->
   <div class="panel">
     <div class="togrow" style="margin-bottom:14px">
@@ -432,74 +457,44 @@
     </div>
   </div>
 
-  <!-- ===== SHEET (toggle) ===== -->
-  <div class="panel" id="sheetPanel" style="display:none">
-    <h2>Sheet Music</h2>
-    <div class="sheet-row">
-      <div><p class="sheet-cap">Scale</p><div class="sheet-box" id="sheetScale"></div></div>
-      <div><p class="sheet-cap">Selected chord</p><div class="sheet-box" id="sheetChord"></div></div>
+  <!-- ===== FREE-FLOWING (falling keys) ===== -->
+  <div class="panel collapsible" id="freeFlowPanel" style="display:none">
+    <h2 data-collapse>🌊 Play It Free-Flowing (Falling Keys)</h2>
+    <div class="collapse-body">
+      <p class="muted" style="margin:2px 0 10px">Send this progression to the Score Player as a falling-notes arrangement. Pick a <b>style</b>, whether it stays put or <b>roams</b> the keyboard, and a difficulty.</p>
+      <div class="row" style="gap:14px;flex-wrap:wrap;align-items:center">
+        <div class="ctl"><label>Style</label>
+          <div class="seg" id="arrStyleSeg">
+            <button data-s="chords" class="on" title="Bass note in the left hand, chord in the right">Chords + bass</button>
+            <button data-s="arpeggio" title="Roll the chord tones one at a time, up and down">Arpeggio</button>
+            <button data-s="broken" title="Thumb first, then the top notes — the classic broken-chord pattern">Broken</button>
+            <button data-s="all" title="Play the whole progression through all three styles in a row">All styles</button>
+          </div>
+        </div>
+        <div class="ctl"><label>Motion</label>
+          <div class="seg" id="arrMotionSeg">
+            <button data-mo="static" class="on" title="Stay in one place on the keyboard (voice-led) — drill the style in one spot">Static</button>
+            <button data-mo="roaming" title="Invert and walk the chord up and down the keyboard, both hands moving">Roaming</button>
+          </div>
+        </div>
+        <div class="ctl"><label>Bass</label>
+          <div class="seg" id="arrBassSeg">
+            <button data-b="root5" class="on" title="Left hand plays the root and the 5th (the oom-pah on medium, walking on hard)">Root + 5th</button>
+            <button data-b="octaves" title="Left hand plays two of the SAME note an octave apart — together on easy, root-then-octave hammer on medium, alternating on hard">Octaves</button>
+          </div>
+        </div>
+        <div class="ctl"><label>Level</label>
+          <div class="seg" id="arrLevelSeg">
+            <button data-l="easy">Easy</button>
+            <button data-l="medium" class="on">Medium</button>
+            <button data-l="hard">Hard</button>
+          </div>
+        </div>
+        <button class="action primary" id="sendWaterfallBtn">🌊 Send to Score Player →</button>
+      </div>
+      <p class="muted arr-hint" id="arrHint" style="margin:10px 0 0"></p>
     </div>
   </div>
-
-  <div class="cols">
-    <!-- ===== PROGRESSION ===== -->
-    <div class="panel collapsible" id="progPanel">
-      <h2 data-collapse>Build a Progression (Number Pattern)</h2>
-      <div class="collapse-body">
-        <p class="muted" style="margin:2px 0 10px">Tap numbers to stack them, grab a preset, or load a real song below.</p>
-        <div class="deg-btns" id="degBtns"></div>
-        <div class="presets" id="presets"></div>
-        <details class="subcollapse" id="songLibDetails">
-          <summary>🎵 Song library</summary>
-          <div class="songbtns" id="songbtns" style="margin-top:10px"></div>
-        </details>
-        <div class="prog-chips" id="progChips" style="margin-top:12px"></div>
-        <div class="row" style="margin-top:12px">
-          <button class="action primary" id="playProgBtn">▶ Play</button>
-          <button class="action" id="clearProgBtn">Clear</button>
-          <div class="pill blue" id="loopPill" style="padding:8px 14px"><span class="ind"></span>Loop <span class="st">Off</span></div>
-          <div class="ctl"><label>Beats / chord</label>
-            <select id="bpcSel"><option>1</option><option>2</option><option selected>4</option></select>
-          </div>
-          <button class="action" id="shareBtn">🔗 Copy link</button>
-        </div>
-        <div class="arrbar">
-          <div class="arrbar-title">🌊 Play it free-flowing (falling keys)</div>
-          <p class="muted" style="margin:2px 0 10px">Send this progression to the Score Player as a falling-notes arrangement. Pick a <b>style</b>, whether it stays put or <b>roams</b> the keyboard, and a difficulty.</p>
-          <div class="row" style="gap:14px;flex-wrap:wrap;align-items:center">
-            <div class="ctl"><label>Style</label>
-              <div class="seg" id="arrStyleSeg">
-                <button data-s="chords" class="on" title="Bass note in the left hand, chord in the right">Chords + bass</button>
-                <button data-s="arpeggio" title="Roll the chord tones one at a time, up and down">Arpeggio</button>
-                <button data-s="broken" title="Thumb first, then the top notes — the classic broken-chord pattern">Broken</button>
-                <button data-s="all" title="Play the whole progression through all three styles in a row">All styles</button>
-              </div>
-            </div>
-            <div class="ctl"><label>Motion</label>
-              <div class="seg" id="arrMotionSeg">
-                <button data-mo="static" class="on" title="Stay in one place on the keyboard (voice-led) — drill the style in one spot">Static</button>
-                <button data-mo="roaming" title="Invert and walk the chord up and down the keyboard, both hands moving">Roaming</button>
-              </div>
-            </div>
-            <div class="ctl"><label>Bass</label>
-              <div class="seg" id="arrBassSeg">
-                <button data-b="root5" class="on" title="Left hand plays the root and the 5th (the oom-pah on medium, walking on hard)">Root + 5th</button>
-                <button data-b="octaves" title="Left hand plays two of the SAME note an octave apart — together on easy, root-then-octave hammer on medium, alternating on hard">Octaves</button>
-              </div>
-            </div>
-            <div class="ctl"><label>Level</label>
-              <div class="seg" id="arrLevelSeg">
-                <button data-l="easy">Easy</button>
-                <button data-l="medium" class="on">Medium</button>
-                <button data-l="hard">Hard</button>
-              </div>
-            </div>
-            <button class="action primary" id="sendWaterfallBtn">🌊 Send to Score Player →</button>
-          </div>
-          <p class="muted arr-hint" id="arrHint" style="margin:10px 0 0"></p>
-        </div>
-      </div>
-    </div>
 
     <!-- ===== METRONOME / DRUMS ===== -->
     <div class="panel">
@@ -519,6 +514,14 @@
         <div class="seg" id="drumSeg"></div>
       </div>
       <div class="beat-dots" id="beatDots" style="margin-top:16px"></div>
+    </div>
+
+  <!-- ===== SHEET (toggle) ===== -->
+  <div class="panel" id="sheetPanel" style="display:none">
+    <h2>Sheet Music</h2>
+    <div class="sheet-row">
+      <div><p class="sheet-cap">Scale</p><div class="sheet-box" id="sheetScale"></div></div>
+      <div><p class="sheet-cap">Selected chord</p><div class="sheet-box" id="sheetChord"></div></div>
     </div>
   </div>
 
@@ -939,9 +942,11 @@ function arrange(prog,style,motion,level,bassMode){
   const barLen=Math.max(0.6,(state.beatsPerChord||4)*beat);
   const steps=climbSteps(level), order=['chords','arpeggio','broken'];
   // Smooth = fewest-finger-movement voice-leading (the Trainer's ✨ Smooth toggle).
-  // It's the opposite of roaming (which deliberately walks up/down), so it only
-  // applies to static motion — the case where root position "doesn't flow".
-  const useSmooth=state.smooth&&motion!=='roaming';
+  // It's the "path of least resistance" mode: each chord is voiced as close as possible
+  // to the previous one, so the line never leaps. It takes PRIORITY over roaming — with
+  // Smooth on, we voice-lead instead of resetting each chord to a low root (which is what
+  // caused the big downward jumps / "breaks" between chords).
+  const useSmooth=state.smooth;
   const notes=[];let t=0,bar=0,prevTones=null;
   prog.forEach((d,pi)=>{
     const c=chords[d];if(!c)return;
@@ -951,12 +956,12 @@ function arrange(prog,style,motion,level,bassMode){
     const bass=bassNotes(c,lhRoot,level,barLen,bassMode);
     const lhTop=Math.max(...bass.map(b=>b.m));
     // RIGHT HAND voicing:
+    //   smooth  → voice-lead from the previous chord (fewest finger moves) — wins over roaming
     //   roaming → climb/invert up the keyboard and gently back down
-    //   smooth  → voice-lead from the previous chord (fewest finger moves)
     //   else    → root position near C4
     let tones;
-    if(motion==='roaming')      tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
-    else if(useSmooth)          tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    if(useSmooth)               tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    else if(motion==='roaming') tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
     else                        tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;            // voice-lead the NEXT chord toward this (pre-fit) voicing
     let fig=fitBlock(rhFigure(tones,st,level,barLen),lhTop);
@@ -1005,12 +1010,13 @@ function sendToWaterfall(){
 // repetition. Uses the same voicing as the real arranger so it reads identically.
 function arrangePreview(prog){
   const barLen=1;                                   // one time-unit per chord — even spacing
-  const useSmooth=state.smooth&&arrMotion!=='roaming';
-  const steps=climbSteps('easy'), order=['chords','arpeggio','broken'];
+  // The preview intentionally shows ONLY the chord (right-hand block) + the bass note —
+  // NOT the free-flowing style (block/broken/arpeggio) or roaming. It's just "here are the
+  // notes in this chord and its bass," so it never mimics what the Score Player will play.
+  const useSmooth=state.smooth;
   const notes=[];let t=0,bar=0,prevTones=null;
   prog.forEach((d,pi)=>{
     const c=chords[d];if(!c)return;
-    const st=arrStyle==='all'?order[pi%3]:arrStyle;
     const lhRoot=pcInOctave(c.rootPc,40), octUp=lhRoot+12;
     // LEFT HAND — one hit of the bass choice, held for the bar.
     // Octaves shows root + its octave; Root+5th preview shows just the root note.
@@ -1018,14 +1024,13 @@ function arrangePreview(prog){
       ? [{m:lhRoot,nm:c.rootName},{m:octUp,nm:c.rootName}]
       : [{m:lhRoot,nm:c.rootName}];
     const lhTop=Math.max(...bass.map(b=>b.m));
-    // RIGHT HAND — same voicing selection as arrange()
+    // RIGHT HAND — smooth voice-leads chord-to-chord; otherwise root position near C4.
     let tones;
-    if(arrMotion==='roaming') tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
-    else if(useSmooth)        tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
-    else                      tones=tonesFrom(c,pcInOctave(c.rootPc,57));
+    if(useSmooth) tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    else          tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;
-    // ONE figure: block = all together; broken = thumb then top-together; arpeggio = one up-run
-    const fig=fitBlock(rhFigure(tones,st,'easy',barLen),lhTop);
+    // ALWAYS a block chord (all tones together) — the shape of the chord, nothing more.
+    const fig=fitBlock(rhFigure(tones,'chords','easy',barLen),lhTop);
     bass.forEach(b=>{if(b.m>=KB_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t,t+barLen*0.98,'L',b.nm));});
     fig.forEach(f=>{if(f.m>=KB_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
     t+=barLen;bar++;
@@ -1038,13 +1043,14 @@ function arrangePreview(prog){
 // showing just one hit per chord. Updates on progression / Style / Bass / Level / Motion.
 function renderArrPreview(){
   const panel=$('arrPreviewPanel'),cv=$('arrPreview');if(!panel||!cv)return;
+  // The free-flowing (send-to-player) panel appears alongside the preview: both need a progression.
+  const ff=$('freeFlowPanel');if(ff)ff.style.display=(state.progression.length&&chords.length)?'block':'none';
   if(!state.progression.length||!chords.length){panel.style.display='none';return;}
   let arr;try{arr=arrangePreview(state.progression);}catch(_){panel.style.display='none';return;}
   if(!arr.notes.length){panel.style.display='none';return;}
   panel.style.display='block';
   const bassLbl=arrBass==='octaves'?'Octaves':'Root + 5th';
-  const motionLbl=arrMotion==='roaming'?'Roaming':(state.smooth?'Smooth':'Static');
-  $('arrPrevMode').textContent=`${STYLE_LBL[arrStyle]} · ${bassLbl} bass · ${motionLbl} · ${arrangeLevel}`;
+  $('arrPrevMode').textContent=`Chords + ${bassLbl} bass${state.smooth?' · Smooth voicing':''}`;
   // Static snapshot that looks EXACTLY like the Score Player: full 88-key keyboard
   // along the bottom, notes falling above it toward the hit line. Fixed 240px tall.
   const H=320;
