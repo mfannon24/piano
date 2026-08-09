@@ -298,6 +298,8 @@
   /* static arrangement preview */
   .arrprev-wrap{width:100%;max-width:88%;margin:0 auto;background:#12151f;border:1px solid var(--line);border-radius:14px;overflow:hidden}
   #arrPreview{display:block;width:100%;height:320px}
+  .arrprev-bass{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:2px 0 10px}
+  .arrprev-bass .lab{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
   .arrprev-legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 10px}
   .arrprev-legend .sw{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:5px;vertical-align:-2px}
   /* flowkey-style horizontal scrolling strip */
@@ -439,6 +441,14 @@
   <div class="panel collapsible" id="arrPreviewPanel" style="display:none">
     <h2 data-collapse>Preview <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:600">— how this progression looks in the Score Player (before you play it)</span></h2>
     <div class="collapse-body">
+      <div class="arrprev-bass">
+        <span class="lab">Left-hand bass</span>
+        <div class="seg" id="prevBassSeg">
+          <button data-b="root" title="Just the root note in the left hand">Root</button>
+          <button data-b="octaves" class="on" title="Root + its octave — the two notes you'd play in the left hand">Octaves</button>
+          <button data-b="root5" title="Root + the fifth">Root + 5th</button>
+        </div>
+      </div>
       <div class="arrprev-legend">
         <span><i class="sw" style="background:#38bdf8"></i>Right hand</span>
         <span><i class="sw" style="background:#a78bfa"></i>Left hand (bass)</span>
@@ -479,8 +489,9 @@
         </div>
         <div class="ctl"><label>Bass</label>
           <div class="seg" id="arrBassSeg">
-            <button data-b="root5" class="on" title="Left hand plays the root and the 5th (the oom-pah on medium, walking on hard)">Root + 5th</button>
-            <button data-b="octaves" title="Left hand plays two of the SAME note an octave apart — together on easy, root-then-octave hammer on medium, alternating on hard">Octaves</button>
+            <button data-b="root" title="Left hand plays just the root note">Root</button>
+            <button data-b="octaves" class="on" title="Left hand plays two of the SAME note an octave apart — together on easy, root-then-octave hammer on medium, alternating on hard">Octaves</button>
+            <button data-b="root5" title="Left hand plays the root and the 5th (the oom-pah on medium, walking on hard)">Root + 5th</button>
           </div>
         </div>
         <div class="ctl"><label>Level</label>
@@ -855,12 +866,24 @@ const ntv=(midi,start,end,hand,name)=>({midi,start,end,hand,name:name||null});
 // Lowest midi note whose PITCH CLASS is `pc`, at or above `base`. (base need not be
 // a C: we align to the actual pitch class, so notes come out correct in every key.)
 function pcInOctave(pc,base){pc=(((pc%12)+12)%12);let m=Math.floor(base/12)*12+pc;while(m<base)m+=12;return m;}
+// Drop a whole bass group (preserving its internal intervals) by octaves until its highest
+// note (the THUMB, closest to the chord) sits strictly BELOW the right hand's lowest note —
+// so the two hands never share a key and the bass never climbs into the chord. This is the
+// "always drop the bass to a lower octave if need be" rule (e.g. Am, where the bass would
+// otherwise land on the same A as the right hand). Won't drop below the keyboard floor.
+function tuckBassUnderRH(bass,rhLo){
+  if(!bass.length)return bass;
+  while(Math.max(...bass.map(b=>b.m))>=rhLo && Math.min(...bass.map(b=>b.m))-12>=ARR_LO){bass.forEach(b=>b.m-=12);}
+  return bass;
+}
 // Intervals of the chord above its root, e.g. major=[0,4,7], dom7=[0,4,7,10].
 function chordIntervals(c){return c.midis.map(m=>(((m-c.rootPc)%12)+12)%12).sort((a,b)=>a-b);}
 // Chord tones (close position, ascending) built up from a given root midi.
 function tonesFrom(c,rootMidi){return chordIntervals(c).map(i=>rootMidi+i).sort((a,b)=>a-b);}
 
-// ---- LEFT-HAND BASS. Two selectable types; Level sets how busy it is. ----
+// ---- LEFT-HAND BASS. Three selectable types; Level sets how busy it is. ----
+//   'root'     → just the root, one note. easy = held; medium = root on beats 1 & 3;
+//                hard = root on every quarter. The simplest single-note bass.
 //   'octaves'  → two of the SAME note (root + its octave). easy = struck together and
 //                held; medium = bottom root then hammer the octave (oom-pah); hard =
 //                alternating root/octave quarter notes.
@@ -871,10 +894,20 @@ function tonesFrom(c,rootMidi){return chordIntervals(c).map(i=>rootMidi+i).sort(
 function bassNotes(c,rootMidi,level,barLen,bassMode){
   const q=barLen/4, iv=chordIntervals(c);
   const third=rootMidi+(iv[1]!=null?iv[1]:4), fifth=rootMidi+(iv[2]!=null?iv[2]:7);
+  // LEFT-HAND SHAPE. rootMidi is the PINKY (furthest from the chord). The upper note is
+  // the THUMB (closest to the chord, just to its left). The caller has already tucked this
+  // whole group below the right hand, so neither note collides with the chord.
+  //   octaves → pinky = root, thumb = the octave above it.
+  //   root5   → pinky = root, thumb = the fifth above it.
   const octUp=rootMidi+12, nm=c.rootName;
+  if(bassMode==='root'){
+    if(level==='easy')   return [{m:rootMidi,s:0,e:barLen*0.98,nm}];                                          // one note, held
+    if(level==='medium') return [{m:rootMidi,s:0,e:q*2*0.95,nm},{m:rootMidi,s:q*2,e:barLen*0.98,nm}];         // beats 1 & 3
+    return [{m:rootMidi,s:0,e:q*0.95,nm},{m:rootMidi,s:q,e:q*2*0.95,nm},{m:rootMidi,s:q*2,e:q*3*0.95,nm},{m:rootMidi,s:q*3,e:barLen*0.98,nm}]; // every quarter
+  }
   if(bassMode==='octaves'){
     if(level==='easy')   return [{m:rootMidi,s:0,e:barLen*0.98,nm},{m:octUp,s:0,e:barLen*0.98,nm}];          // both together, held
-    if(level==='medium') return [{m:rootMidi,s:0,e:q*2*0.95,nm},{m:octUp,s:q*2,e:barLen*0.98,nm}];           // bottom root, then hammer the octave
+    if(level==='medium') return [{m:rootMidi,s:0,e:q*2*0.95,nm},{m:octUp,s:q*2,e:barLen*0.98,nm}];           // pinky root, then thumb octave (oom-pah)
     return [{m:rootMidi,s:0,e:q*0.95,nm},{m:octUp,s:q,e:q*2*0.95,nm},{m:rootMidi,s:q*2,e:q*3*0.95,nm},{m:octUp,s:q*3,e:barLen*0.98,nm}]; // alternating quarters
   }
   // root + fifth
@@ -885,25 +918,32 @@ function bassNotes(c,rootMidi,level,barLen,bassMode){
 
 // ---- RIGHT-HAND figure for a STYLE. Onset spacing is CONSTANT within a figure. ----
 // tones = close-position chord tones (ascending). Returns [{m,s,e}].
-function rhFigure(tones,style,level,barLen){
+function rhFigure(tones,style,level,barLen,smooth){
   const out=[], oct=m=>m+12, N=tones.length, put=(m,s,e)=>out.push({m,s,e});
+  // Smooth = path of least resistance. A hard-level figure normally spans ~2 octaves
+  // (arpeggio rolls up two octaves; broken kicks its top notes up an octave). That wide
+  // shape can't climb a long scale without eventually hitting the top of the keyboard and
+  // wrapping down an octave — a jump. In Smooth we NARROW the hard figure to ~1 octave so
+  // it stays put and voice-leads cleanly up any progression. (Non-smooth keeps the full
+  // 2-octave workout.)
+  const wide = level==='hard' && !smooth;
   if(style==='chords'){                          // block chord, hit 1 / 4 / 8 times per bar
     const hits=level==='easy'?1:level==='medium'?4:8, step=barLen/hits;
     for(let i=0;i<hits;i++)tones.forEach(m=>put(m,i*step,i*step+step*(hits===1?0.98:0.85)));
   }else if(style==='arpeggio'){                  // ALWAYS 8 even notes per bar → one steady speed
     const up=tones,dn=[...tones].reverse();
     let contour = level==='easy'?up
-      : level==='medium'?[...up,...dn.slice(1)]                                         // up then down
-      : [...up,...up.map(oct),...dn.slice(1).map(oct),...dn.slice(1)];                  // 2-octave up/down
+      : (level==='medium'||!wide)?[...up,...dn.slice(1)]                                // up then down (1 octave)
+      : [...up,...up.map(oct),...dn.slice(1).map(oct),...dn.slice(1)];                  // 2-octave up/down (hard, non-smooth)
     const slots=8,step=barLen/slots;
     for(let i=0;i<slots;i++)put(contour[i%contour.length],i*step,i*step+step*1.3);
   }else{                                         // broken — THUMB alone, then TOP notes TOGETHER (alternating)
     const bottom=tones[0], top=tones.slice(1);     // thumb = lowest tone; top = the 2 (or more) notes above it
-    const topHi=top.map(oct);                       // top voiced an octave higher (hard only)
+    const topHi=top.map(oct);                       // top voiced an octave higher (hard, non-smooth only)
     // each event is a chord struck at once → alternate [thumb] / [top together]
     const seq = level==='easy'  ? [[bottom],top]                                  // 2 events/bar, slow
-      : level==='medium'        ? [[bottom],top,[bottom],top]                     // 4 events/bar
-      :                           [[bottom],top,[bottom],topHi];                  // hard: top jumps up an octave
+      : (level==='medium'||!wide)? [[bottom],top,[bottom],top]                    // 4 events/bar (1 octave)
+      :                           [[bottom],top,[bottom],topHi];                  // hard non-smooth: top jumps up an octave
     const step=barLen/seq.length;
     seq.forEach((ev,i)=>ev.forEach(m=>put(m,i*step,i*step+step*0.9)));
   }
@@ -923,10 +963,20 @@ function climbTones(baseTones,step){
 }
 // Shift a whole RH figure (as a block, preserving its shape) to sit above the LH
 // bass and on the keyboard — so we never DROP notes and never overlap the left hand.
-function fitBlock(fig,lhTop){
+//   smooth=true → PRESERVE the voice-led register. Smooth voicing already picks the
+//   path-of-least-resistance placement; we only move it by whole octaves if it runs
+//   off the keyboard. We do NOT shove it up to clear the left hand — that teleports the
+//   whole hand an octave and breaks least-resistance (the "chord jumps way up" bug). A
+//   low bass note sharing the RH's low keys is fine — that's how you actually play it.
+function fitBlock(fig,lhTop,smooth){
   if(!fig.length)return fig;
   const lo=Math.min(...fig.map(f=>f.m)),hi=Math.max(...fig.map(f=>f.m));
   let shift=0;
+  if(smooth){
+    while(hi+shift>KB_HI)shift-=12;               // keep the top on the keyboard
+    while(lo+shift<KB_LO)shift+=12;               // keep the bottom on the keyboard
+    return fig.map(f=>({m:f.m+shift,s:f.s,e:f.e}));
+  }
   while(hi+shift>KB_HI)shift-=12;                 // pull under the top of the keyboard
   while(lo+shift<=lhTop+2)shift+=12;              // keep clear of the left hand
   while(hi+shift>KB_HI&&lo+shift-12>lhTop)shift-=12;
@@ -947,15 +997,17 @@ function arrange(prog,style,motion,level,bassMode){
   // Smooth on, we voice-lead instead of resetting each chord to a low root (which is what
   // caused the big downward jumps / "breaks" between chords).
   const useSmooth=state.smooth;
+  // LEFT-HAND BASS ANCHOR: pin the floor to the TONIC of the key, so the 1 chord is the
+  // lowest bass note and every other scale degree stacks upward in key order (2 above 1,
+  // 3 above 2 …). A fixed floor wrapped low pitch classes up an octave, which put the
+  // tonic ABOVE later degrees — the "1 chord is far right, next note drops down" bug.
+  const bassFloor=pcInOctave(pcOf(state.keyRoot),36);
   const notes=[];let t=0,bar=0,prevTones=null;
   prog.forEach((d,pi)=>{
     const c=chords[d];if(!c)return;
     const st=style==='all'?order[pi%3]:style;
-    // LEFT HAND — low single-note bass anchored in E2..D#3
-    const lhRoot=pcInOctave(c.rootPc,40);
-    const bass=bassNotes(c,lhRoot,level,barLen,bassMode);
-    const lhTop=Math.max(...bass.map(b=>b.m));
-    // RIGHT HAND voicing:
+    // RIGHT HAND voicing FIRST — the left hand is then tucked underneath it, so the hands
+    // never collide (the "Am looks weird / bass on the same key as the chord" bug).
     //   smooth  → voice-lead from the previous chord (fewest finger moves) — wins over roaming
     //   roaming → climb/invert up the keyboard and gently back down
     //   else    → root position near C4
@@ -964,10 +1016,17 @@ function arrange(prog,style,motion,level,bassMode){
     else if(motion==='roaming') tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
     else                        tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;            // voice-lead the NEXT chord toward this (pre-fit) voicing
-    let fig=fitBlock(rhFigure(tones,st,level,barLen),lhTop);
+    // Place the RH on the keyboard. lhTop=0 here means "no left hand to clear" — the bass
+    // is positioned relative to the RH afterward, not the other way around.
+    let fig=fitBlock(rhFigure(tones,st,level,barLen,useSmooth),0,useSmooth);
+    const rhLo=Math.min(...fig.map(f=>f.m));
+    // LEFT HAND — bass ordered by scale degree (pinky = root, thumb = octave/5th above it),
+    // then dropped by whole octaves until the thumb sits just below the right hand.
+    const lhRoot=pcInOctave(c.rootPc,bassFloor);
+    const bass=tuckBassUnderRH(bassNotes(c,lhRoot,level,barLen,bassMode),rhLo);
     // emit (final on-keyboard guard is a no-op given fitBlock, but keeps us safe)
-    bass.forEach(b=>{if(b.m>=KB_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t+b.s,t+b.e,'L',b.nm||null));});
-    fig.forEach(f=>{if(f.m>=KB_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
+    bass.forEach(b=>{if(b.m>=ARR_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t+b.s,t+b.e,'L',b.nm||null));});
+    fig.forEach(f=>{if(f.m>=ARR_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
     t+=barLen;bar++;
   });
   // total time is an exact whole number of bars, so a loop wraps on the downbeat
@@ -975,7 +1034,7 @@ function arrange(prog,style,motion,level,bassMode){
   return {notes,duration:bar*barLen};
 }
 
-let arrStyle='chords',arrMotion='static',arrangeLevel='medium',arrBass='root5';
+let arrStyle='chords',arrMotion='static',arrangeLevel='medium',arrBass='octaves';
 const STYLE_LBL={chords:'Chords + bass',arpeggio:'Arpeggio',broken:'Broken',all:'All styles'};
 function sendToWaterfall(){
   if(!state.progression.length){toast('Build a progression first — tap some numbers.');return;}
@@ -1014,25 +1073,37 @@ function arrangePreview(prog){
   // NOT the free-flowing style (block/broken/arpeggio) or roaming. It's just "here are the
   // notes in this chord and its bass," so it never mimics what the Score Player will play.
   const useSmooth=state.smooth;
+  // Anchor the bass to the tonic so the 1 chord is lowest and degrees stack upward in key
+  // order (matches the real arranger). Fixed floor wrapped low pitch classes up an octave.
+  const bassFloor=pcInOctave(pcOf(state.keyRoot),36);
   const notes=[];let t=0,bar=0,prevTones=null;
   prog.forEach((d,pi)=>{
     const c=chords[d];if(!c)return;
-    const lhRoot=pcInOctave(c.rootPc,40), octUp=lhRoot+12;
-    // LEFT HAND — one hit of the bass choice, held for the bar.
-    // Octaves shows root + its octave; Root+5th preview shows just the root note.
-    const bass=arrBass==='octaves'
-      ? [{m:lhRoot,nm:c.rootName},{m:octUp,nm:c.rootName}]
-      : [{m:lhRoot,nm:c.rootName}];
-    const lhTop=Math.max(...bass.map(b=>b.m));
-    // RIGHT HAND — smooth voice-leads chord-to-chord; otherwise root position near C4.
+    const lhRoot=pcInOctave(c.rootPc,bassFloor), octUp=lhRoot+12;
+    const iv=chordIntervals(c), fifth=lhRoot+(iv[2]!=null?iv[2]:7);
+    // RIGHT HAND FIRST — smooth voice-leads chord-to-chord; otherwise root position near C4.
+    // The bass is then tucked underneath it, so the two hands never share a key.
     let tones;
     if(useSmooth) tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
     else          tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;
     // ALWAYS a block chord (all tones together) — the shape of the chord, nothing more.
-    const fig=fitBlock(rhFigure(tones,'chords','easy',barLen),lhTop);
-    bass.forEach(b=>{if(b.m>=KB_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t,t+barLen*0.98,'L',b.nm));});
-    fig.forEach(f=>{if(f.m>=KB_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
+    const fig=fitBlock(rhFigure(tones,'chords','easy',barLen),0,useSmooth);
+    const rhLo=Math.min(...fig.map(f=>f.m));
+    // LEFT HAND — one hit of the bass choice, pinky = root, thumb = octave/5th above it.
+    //   root    → just the root note
+    //   octaves → root + its octave
+    //   root5   → root + the fifth
+    // Then dropped by whole octaves until the thumb sits just below the right hand — so
+    // the bass never lands on a key the chord is using (the "Am looks weird" collision).
+    const bass=tuckBassUnderRH(
+      arrBass==='octaves'
+      ? [{m:lhRoot,nm:c.rootName},{m:octUp,nm:c.rootName}]
+      : arrBass==='root5'
+      ? [{m:lhRoot,nm:c.rootName},{m:fifth,nm:c.rootName}]
+      : [{m:lhRoot,nm:c.rootName}], rhLo);
+    bass.forEach(b=>{if(b.m>=ARR_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t,t+barLen*0.98,'L',b.nm));});
+    fig.forEach(f=>{if(f.m>=ARR_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
     t+=barLen;bar++;
   });
   return {notes,duration:bar*barLen};
@@ -1049,7 +1120,7 @@ function renderArrPreview(){
   let arr;try{arr=arrangePreview(state.progression);}catch(_){panel.style.display='none';return;}
   if(!arr.notes.length){panel.style.display='none';return;}
   panel.style.display='block';
-  const bassLbl=arrBass==='octaves'?'Octaves':'Root + 5th';
+  const bassLbl=BASS_LBL[arrBass]||'Octaves';
   $('arrPrevMode').textContent=`Chords + ${bassLbl} bass${state.smooth?' · Smooth voicing':''}`;
   // Static snapshot that looks EXACTLY like the Score Player: full 88-key keyboard
   // along the bottom, notes falling above it toward the hit line. Fixed 240px tall.
@@ -1385,6 +1456,11 @@ const $=id=>document.getElementById(id);
    key: 24 semitones each side, and the view auto-centers on it.
    ========================================================= */
 const KB_LO=36,KB_HI=84; // C2 .. C6 — Middle C (60) is the dead-center white key
+// The generated ARRANGEMENT (waterfall + preview) can use a lower bass floor than the
+// drawn trainer keyboard — the Score Player shows the full 88 keys and the preview
+// auto-zooms to the range in use — so an octave/5th bass always has room to tuck an
+// octave below the right hand without being clamped off the keyboard.
+const ARR_LO=24; // C1 — bass floor for generated arrangements
 function buildKeyboard(){
   const kb=$('keyboard');kb.innerHTML='';keyEls={};
   const W=42,BW=27,blackPCs=[1,3,6,8,10];let wi=0;
@@ -1945,14 +2021,23 @@ const STYLE_HINTS={
           hard:'Walking bass; right hand runs a broken pattern that reaches up to the octave.'}};
 const MOTION_HINTS={static:'Stays in one place on the keyboard so you can drill the technique in one spot.',
                     roaming:'The same style gently climbs the keyboard and walks back down.'};
-const BASS_HINTS={root5:'Left hand plays root & 5th.',octaves:'Left hand plays two of the same note an octave apart.'};
+const BASS_HINTS={root:'Left hand plays just the root note.',root5:'Left hand plays root & 5th.',octaves:'Left hand plays two of the same note an octave apart.'};
+const BASS_LBL={root:'Root',octaves:'Octaves',root5:'Root + 5th'};
 function updateArrHint(){const h=$('arrHint');if(!h)return;
   const sh=arrStyle==='all'?'Rotates one chord as chords, the next as arpeggio, the next as broken — then repeats.':STYLE_HINTS[arrStyle][arrangeLevel];
-  const bassLbl=arrBass==='octaves'?'Octaves':'Root + 5th';
+  const bassLbl=BASS_LBL[arrBass]||'Octaves';
   h.innerHTML=`<b>${STYLE_LBL[arrStyle]} · ${arrMotion==='roaming'?'Roaming':'Static'} · ${bassLbl} bass · ${arrangeLevel}:</b> ${sh} ${BASS_HINTS[arrBass]} ${MOTION_HINTS[arrMotion]}`;}
 $('arrStyleSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{arrStyle=b.dataset.s;$('arrStyleSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));updateArrHint();renderArrPreview();}));
 $('arrMotionSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{arrMotion=b.dataset.mo;$('arrMotionSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));updateArrHint();renderArrPreview();}));
-$('arrBassSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{arrBass=b.dataset.b;$('arrBassSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));updateArrHint();renderArrPreview();}));
+// Bass choice is shared between the preview toggle and the free-flow toggle, so the
+// preview always matches what gets sent to the Score Player. Setting it lights the
+// matching button in BOTH segmented controls.
+function setArrBass(mode){
+  arrBass=mode;
+  ['arrBassSeg','prevBassSeg'].forEach(id=>{const seg=$(id);if(seg)seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.b===mode));});
+  updateArrHint();renderArrPreview();
+}
+['arrBassSeg','prevBassSeg'].forEach(id=>{const seg=$(id);if(seg)seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>setArrBass(b.dataset.b)));});
 $('arrLevelSeg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{arrangeLevel=b.dataset.l;$('arrLevelSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));updateArrHint();renderArrPreview();}));
 $('sendWaterfallBtn').addEventListener('click',sendToWaterfall);
 updateArrHint();
