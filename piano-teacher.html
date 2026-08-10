@@ -125,6 +125,11 @@
   .key.lit.black{background:linear-gradient(180deg,#4ade80,#15803d)!important}
   .klbl{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;font-weight:800;pointer-events:none;opacity:0}
   .key.white .klbl{color:#55607a} .key.black .klbl{color:#2a3042}
+  /* subtle always-on note names — only shown when the "Note names" toggle is on.
+     Sits near the TOP of each key face (like the scale labels), spelled for the current key. */
+  .knm{position:absolute;top:7px;left:0;right:0;text-align:center;font-size:10px;font-weight:700;letter-spacing:.2px;pointer-events:none;opacity:0;transition:opacity .12s}
+  .keyboard.show-names .knm{opacity:1}
+  .key.white .knm{color:#9aa4ba} .key.black .knm{top:5px;color:#c3cad9}
   .key.in-scale .klbl,.key.in-chord .klbl{opacity:1}
   .kdeg{display:block;font-size:9px;opacity:.75;font-weight:700}
   .rmark{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:10px;font-weight:900;color:#1a2050;opacity:0}
@@ -217,6 +222,16 @@
   .prog-chip.playing .pr,.prog-chip.playing .pn{color:#04331f}
   .prog-chip .x{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;background:var(--pink);color:#fff;border:none;font-size:13px;line-height:1;cursor:pointer}
   .empty-hint{color:var(--muted);font-size:13px}
+  /* Free-Chords picker */
+  .free-pick{display:flex;flex-direction:column;gap:10px}
+  .free-roots{display:flex;gap:6px;flex-wrap:wrap}
+  .free-roots button{min-width:40px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 6px;font-weight:800;cursor:pointer}
+  .free-roots button:hover{border-color:var(--indigo)}
+  .free-roots button.on{background:linear-gradient(180deg,#5b6ee1,#4453c9);border-color:#4453c9;color:#fff}
+  .free-quals{display:flex;gap:6px;flex-wrap:wrap}
+  .free-quals button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:20px;padding:7px 12px;font-size:13px;font-weight:700;cursor:pointer}
+  .free-quals button:hover{border-color:var(--indigo)}
+  .free-quals button.on{background:linear-gradient(180deg,#5b6ee1,#4453c9);border-color:#4453c9;color:#fff}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   button.action{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}
   button.action:hover{border-color:var(--indigo)}
@@ -404,12 +419,37 @@
     </div>
 
 
+    <!-- ===== FREE CHORDS (any chord, any order) ===== -->
+    <div class="panel collapsible closed" id="freePanel">
+      <h2 data-collapse>Free Chords (any chord, any key)</h2>
+      <div class="collapse-body">
+        <p class="muted" style="margin:2px 0 10px">For songs that roam across keys. Pick a root, pick a chord type, tap <b>Add</b>. Plays and sends to the Score Player just like a progression.</p>
+        <div class="free-pick">
+          <div class="free-roots" id="freeRoots"></div>
+          <div class="free-quals" id="freeQuals"></div>
+          <button class="action primary" id="freeAddBtn">+ Add chord</button>
+        </div>
+        <div class="prog-chips" id="freeChips" style="margin-top:12px"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="action primary" id="freePlayBtn">▶ Play</button>
+          <button class="action" id="freeClearBtn">Clear</button>
+          <div class="pill blue" id="freeLoopPill" style="padding:8px 14px"><span class="ind"></span>Loop <span class="st">Off</span></div>
+          <button class="action" id="freeSendBtn">🌊 Send to Score Player</button>
+        </div>
+        <div id="freePrevPanel" style="display:none;margin-top:14px">
+          <div class="muted" style="margin-bottom:6px" id="freePrevMode">Preview</div>
+          <canvas id="freePreview" style="width:100%;display:block;border-radius:12px"></canvas>
+        </div>
+      </div>
+    </div>
+
   <!-- ===== TOGGLES + KEYBOARD ===== -->
   <div class="panel">
     <div class="togrow" style="margin-bottom:14px">
       <div class="pill gold" id="scalePill"><span class="ind"></span>Scale <span class="st">Off</span></div>
       <div class="pill blue on" id="chordPill"><span class="ind"></span>Chord <span class="st">On</span></div>
       <div class="pill gold" id="bassPill"><span class="ind"></span>Bass note <span class="st">Off</span></div>
+      <div class="pill blue" id="namesPill"><span class="ind"></span>Note names <span class="st">Off</span></div>
       <div class="pill blue" id="sheetPill"><span class="ind"></span>Sheet <span class="st">Off</span></div>
       <span style="margin-left:auto"></span>
       <div class="ctl" style="flex-direction:row;align-items:center;gap:6px">
@@ -452,14 +492,15 @@
       <div class="arrprev-legend">
         <span><i class="sw" style="background:#38bdf8"></i>Right hand</span>
         <span><i class="sw" style="background:#a78bfa"></i>Left hand (bass)</span>
-        <span class="muted" id="arrPrevMode" style="margin-left:auto"></span>
+        <label class="chk" style="margin-left:auto"><input type="checkbox" id="prevNames"><span>🔤</span>Note names</label>
+        <span class="muted" id="arrPrevMode"></span>
       </div>
       <div class="arrprev-wrap"><canvas id="arrPreview"></canvas></div>
     </div>
   </div>
 
   <!-- ===== CHORD TECHNIQUE ===== -->
-  <div class="panel collapsible" id="techPanel">
+  <div class="panel collapsible closed" id="techPanel">
     <h2 data-collapse>How to Play This Chord</h2>
     <div class="collapse-body">
       <p class="muted" style="margin:2px 0 12px">Block is the default. Tap a technique to hear it and set how chords play back in the progression too.</p>
@@ -741,6 +782,45 @@ function buildChords(scale,seventh){
   }
   return out;
 }
+// ---- FREE CHORDS: build ANY chord from a root pitch class + a quality, with no key.
+// Produces the SAME object shape buildChords() emits, so the arranger, preview, and
+// waterfall all treat it identically. This is what lets you play songs that roam outside
+// one key (e.g. Emaj7 · A · C# · B · D · G) without picking a single scale.
+const CHORD_QUALITIES=[
+  {id:'maj',   label:'',      long:'major triad',      ivs:[0,4,7]},
+  {id:'min',   label:'m',     long:'minor triad',      ivs:[0,3,7]},
+  {id:'7',     label:'7',     long:'dominant 7th',     ivs:[0,4,7,10]},
+  {id:'maj7',  label:'maj7',  long:'major 7th',        ivs:[0,4,7,11]},
+  {id:'m7',    label:'m7',    long:'minor 7th',        ivs:[0,3,7,10]},
+  {id:'m7b5',  label:'m7♭5',  long:'half-diminished',  ivs:[0,3,6,10]},
+  {id:'dim',   label:'dim',   long:'diminished triad', ivs:[0,3,6]},
+  {id:'dim7',  label:'dim7',  long:'diminished 7th',   ivs:[0,3,6,9]},
+  {id:'aug',   label:'+',     long:'augmented triad',  ivs:[0,4,8]},
+  {id:'sus2',  label:'sus2',  long:'suspended 2nd',    ivs:[0,2,7]},
+  {id:'sus4',  label:'sus4',  long:'suspended 4th',    ivs:[0,5,7]},
+  {id:'6',     label:'6',     long:'major 6th',        ivs:[0,4,7,9]},
+  {id:'m6',    label:'m6',    long:'minor 6th',        ivs:[0,3,7,9]},
+];
+const QUAL_BY_ID=Object.fromEntries(CHORD_QUALITIES.map(q=>[q.id,q]));
+// Spell the root: sharps by default, but honor a flat name if one was chosen explicitly.
+function freeRootName(pc,preferFlat){const CH=preferFlat?CHROMA_FLAT:CHROMA_SHARP;return CH[((pc%12)+12)%12];}
+function makeFreeChord(pc,qualId,preferFlat){
+  pc=((pc%12)+12)%12;
+  const q=QUAL_BY_ID[qualId]||QUAL_BY_ID.maj;
+  const rootName=freeRootName(pc,preferFlat);
+  const rootMidi=60+pc;                                  // voice from middle-C octave; the arranger re-registers it
+  const midis=q.ivs.map(i=>rootMidi+i);
+  const suffix=q.label;
+  return {
+    degree:-1,quality:qualId,suffix,numSuffix:suffix,
+    name:rootName+suffix,
+    numLabel:rootName+suffix,                            // free chords show the chord name, not a Nashville number
+    rootName,rootPc:pc,
+    midis,
+    tones:q.ivs.map(i=>({pc:((pc+i)%12),name:freeRootName(pc+i,preferFlat)})),
+    qualityWord:q.long,
+    free:true};
+}
 function invert(midis,inv){let a=[...midis].sort((x,y)=>x-y);for(let i=0;i<inv;i++){a[0]+=12;a.sort((x,y)=>x-y);}return a;}
 // Standard piano fingering for a voiced chord. Fingers: 1=thumb … 5=pinky.
 // RH: thumb (1) on the lowest note, pinky (5) on top. LH mirrors: pinky (5) low, thumb (1) top.
@@ -876,6 +956,30 @@ function tuckBassUnderRH(bass,rhLo){
   while(Math.max(...bass.map(b=>b.m))>=rhLo && Math.min(...bass.map(b=>b.m))-12>=ARR_LO){bass.forEach(b=>b.m-=12);}
   return bass;
 }
+// Pick which OCTAVE of a bass root to play so the left hand takes the path of least
+// resistance from one chord to the next — the same "keep it close" rule the right hand
+// follows. `pc` is the root pitch class, `prevPinky` the previous bass root's midi (null on
+// the first chord), `rhLo` the right hand's lowest note, `span` how far the bass reaches above
+// the pinky (octaves→12, root+5th→7, root→0). We choose the octave, inside a comfortable bass
+// band, that (1) still fits UNDER the right hand and (2) lands nearest the previous bass note —
+// so consecutive roots stay close instead of leaping (the "super high G then low A" jump). A
+// fixed band means it can't drift lower and lower over a repeated loop.
+const BASS_BAND_LO=33, BASS_BAND_HI=45;               // A1 … A2 — where the pinky root prefers to sit
+function chooseBassRoot(pc,prevPinky,rhLo,span){
+  pc=(((pc%12)+12)%12);
+  const cands=[];for(let m=pc;m+span<=KB_HI;m+=12)if(m>=ARR_LO)cands.push(m);  // every octave that fits
+  if(!cands.length)return pcInOctave(pc,ARR_LO);
+  const target=prevPinky==null?39:prevPinky;                             // D#2-ish home on the first chord
+  // Priorities, in order: (1) the whole hand must clear the right hand — a hard constraint, so
+  // we drop BELOW the band when a low RH forces it (same as the old tuck rule); (2) prefer the
+  // comfortable bass band; (3) land nearest the previous bass note (path of least resistance);
+  // (4) tie → the higher octave.
+  cands.sort((a,b)=>
+    ((a+span<rhLo?0:1)-(b+span<rhLo?0:1)) ||
+    ((a>=BASS_BAND_LO&&a<=BASS_BAND_HI?0:1)-(b>=BASS_BAND_LO&&b<=BASS_BAND_HI?0:1)) ||
+    (Math.abs(a-target)-Math.abs(b-target)) || (b-a));
+  return cands[0];
+}
 // Intervals of the chord above its root, e.g. major=[0,4,7], dom7=[0,4,7,10].
 function chordIntervals(c){return c.midis.map(m=>(((m-c.rootPc)%12)+12)%12).sort((a,b)=>a-b);}
 // Chord tones (close position, ascending) built up from a given root midi.
@@ -950,16 +1054,33 @@ function rhFigure(tones,style,level,barLen,smooth){
   return out;
 }
 
-// Roaming: inversion-walk steps, climbing up then gently back down. Easy is shallow.
-function climbSteps(level){
-  if(level==='easy')   return [0,1,2,1];
-  if(level==='medium') return [0,1,2,3,2,1];
-  return [0,1,2,3,4,3,2,1];
-}
-// Voicing at a climb step: invert within the octave, then shift up whole octaves.
-function climbTones(baseTones,step){
-  const n=baseTones.length;
-  return invert(baseTones,step%n).map(m=>m+12*Math.floor(step/n)).sort((a,b)=>a-b);
+// ROAMING sweep. The register gently CLIMBS up the keyboard and walks back down over the
+// course of the loop, so the arrangement feels free-flowing instead of staying put. Two
+// controls:
+//   • REACH — how far up it travels, set by LEVEL (easy = gentle, hard = far up + back).
+//   • PASSES — how many times through the progression one full up-and-down trip takes, so
+//     the drift is slow. bar 0 always sits at the floor → the loop seams perfectly.
+const ROAM_BASE=53;                                  // F3 — the low end of every sweep (high
+                                                     // enough that the octave bass tucks under
+                                                     // the RH at the base of the sweep)
+const ROAM_REACH={easy:12,medium:18,hard:19};        // semitones of upward travel (capped so the
+                                                     // peak stays under the keyboard ceiling — no
+                                                     // octave-clamp hiccup at the turnaround)
+const ROAM_PASSES={easy:1,medium:2,hard:2};          // progression loops per up-and-down trip
+// Triangle wave 0→1→0 across `total` steps. Loop-safe: index 0 returns 0 (the floor), and
+// it comes back to the floor at the wrap, so consecutive loops join without a jump.
+function triWave(i,total){const f=total>1?(i%total)/total:0;return f<0.5?f*2:(1-f)*2;}
+// Voice a chord in CLOSE position CENTERED on `floor` — a natural inversion so the hand
+// shifts by the smallest amount as the floor drifts. This is the path-of-least-resistance
+// step between roaming chords. We pick each tone's octave NEAREST the floor (it may sit a
+// little below), then anchor the close voicing on the lowest of those. Centering on the
+// floor (rather than always at-or-above it) keeps the RH tracking the sweep tightly, so the
+// climb/descent stays a clean single hump instead of dipping at the turnaround.
+function voiceNear(c,floor){
+  const pcs=chordIntervals(c).map(i=>(((c.rootPc+i)%12)+12)%12);
+  const near=pcs.map(pc=>{const up=pcInOctave(pc,floor),dn=up-12;return Math.abs(dn-floor)<Math.abs(up-floor)?dn:up;});
+  const bottom=Math.min(...near);
+  return pcs.map(pc=>pcInOctave(pc,bottom)).sort((a,b)=>a-b);
 }
 // Shift a whole RH figure (as a block, preserving its shape) to sit above the LH
 // bass and on the keyboard — so we never DROP notes and never overlap the left hand.
@@ -987,51 +1108,76 @@ function fitBlock(fig,lhTop,smooth){
 //   static  → chords stay close together in one place (learn the technique)
 //   roaming → the SELECTED style climbs up the keyboard and back down
 //   style 'all' → rotate chords → arpeggio → broken, one per chord
-function arrange(prog,style,motion,level,bassMode){
+function arrange(prog,style,motion,level,bassMode,srcChords=chords,keyRootName=state.keyRoot){
   const beat=60/(state.bpm||100);
   const barLen=Math.max(0.6,(state.beatsPerChord||4)*beat);
-  const steps=climbSteps(level), order=['chords','arpeggio','broken'];
+  const order=['chords','arpeggio','broken'];
   // Smooth = fewest-finger-movement voice-leading (the Trainer's ✨ Smooth toggle).
   // It's the "path of least resistance" mode: each chord is voiced as close as possible
   // to the previous one, so the line never leaps. It takes PRIORITY over roaming — with
   // Smooth on, we voice-lead instead of resetting each chord to a low root (which is what
   // caused the big downward jumps / "breaks" between chords).
   const useSmooth=state.smooth;
+  // ROAMING drifts the register up the keyboard and back down. It repeats the whole
+  // progression PASSES times so one up-and-down trip spans several loops (a slow, free-
+  // flowing wander). The expanded degree list drives that; static/smooth play it once.
+  const roaming = motion==='roaming' && !useSmooth;
+  const passes = roaming ? (ROAM_PASSES[level]||1) : 1;
+  const seq=[]; for(let p=0;p<passes;p++)prog.forEach((d,pi)=>seq.push({d,pi}));
+  const totalBars=seq.length, reach=ROAM_REACH[level]||12;
   // LEFT-HAND BASS ANCHOR: pin the floor to the TONIC of the key, so the 1 chord is the
   // lowest bass note and every other scale degree stacks upward in key order (2 above 1,
   // 3 above 2 …). A fixed floor wrapped low pitch classes up an octave, which put the
   // tonic ABOVE later degrees — the "1 chord is far right, next note drops down" bug.
-  const bassFloor=pcInOctave(pcOf(state.keyRoot),36);
-  const notes=[];let t=0,bar=0,prevTones=null;
-  prog.forEach((d,pi)=>{
-    const c=chords[d];if(!c)return;
+  const bassFloor=pcInOctave(pcOf(keyRootName),36);
+  const SPAN={root:0,octaves:12,root5:7};
+  const notes=[];let t=0,bar=0,prevTones=null,prevPinky=null;
+  seq.forEach(({d,pi})=>{
+    const c=srcChords[d];if(!c){bar++;return;}
     const st=style==='all'?order[pi%3]:style;
     // RIGHT HAND voicing FIRST — the left hand is then tucked underneath it, so the hands
     // never collide (the "Am looks weird / bass on the same key as the chord" bug).
     //   smooth  → voice-lead from the previous chord (fewest finger moves) — wins over roaming
-    //   roaming → climb/invert up the keyboard and gently back down
+    //   roaming → close-position voicing whose floor rides a slow up-and-down sweep
     //   else    → root position near C4
     let tones;
-    if(useSmooth)               tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
-    else if(motion==='roaming') tones=climbTones(tonesFrom(c,pcInOctave(c.rootPc,57)),steps[bar%steps.length]);
-    else                        tones=tonesFrom(c,pcInOctave(c.rootPc,57));
+    if(useSmooth)     tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    else if(roaming)  tones=voiceNear(c,Math.round(ROAM_BASE+triWave(bar,totalBars)*reach));
+    else              tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;            // voice-lead the NEXT chord toward this (pre-fit) voicing
     // Place the RH on the keyboard. lhTop=0 here means "no left hand to clear" — the bass
     // is positioned relative to the RH afterward, not the other way around.
-    let fig=fitBlock(rhFigure(tones,st,level,barLen,useSmooth),0,useSmooth);
+    // In roaming the sweep itself supplies the vertical travel, so keep the figure compact
+    // (~1 octave) and register-preserving — same as smooth — or a 2-octave hard figure
+    // slams the ceiling and octave-clamps into an erratic zig-zag instead of a clean climb.
+    const compact=useSmooth||roaming;
+    let fig=fitBlock(rhFigure(tones,st,level,barLen,compact),0,compact);
     const rhLo=Math.min(...fig.map(f=>f.m));
-    // LEFT HAND — bass ordered by scale degree (pinky = root, thumb = octave/5th above it),
-    // then dropped by whole octaves until the thumb sits just below the right hand.
-    const lhRoot=pcInOctave(c.rootPc,bassFloor);
-    const bass=tuckBassUnderRH(bassNotes(c,lhRoot,level,barLen,bassMode),rhLo);
+    // LEFT HAND — bass ordered by scale degree (pinky = root, thumb = octave/5th above it).
+    //   roaming → keep the bass anchored to the tonic floor + tuck under the RH, so it rides
+    //             along with the sweep (roaming is already dialed in; don't disturb it).
+    //   else    → voice-lead the bass: choose the octave nearest the previous bass note so the
+    //             left hand takes the path of least resistance too (no big root-to-root leaps).
+    let bass;
+    if(roaming){
+      const lhRoot=pcInOctave(c.rootPc,bassFloor);
+      bass=tuckBassUnderRH(bassNotes(c,lhRoot,level,barLen,bassMode),rhLo);
+    }else{
+      const lhRoot=chooseBassRoot(c.rootPc,prevPinky,rhLo,SPAN[bassMode]!=null?SPAN[bassMode]:12);
+      bass=bassNotes(c,lhRoot,level,barLen,bassMode);
+    }
+    prevPinky=Math.min(...bass.map(b=>b.m));
     // emit (final on-keyboard guard is a no-op given fitBlock, but keeps us safe)
     bass.forEach(b=>{if(b.m>=ARR_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t+b.s,t+b.e,'L',b.nm||null));});
     fig.forEach(f=>{if(f.m>=ARR_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
     t+=barLen;bar++;
   });
+  // per-bar chord strip (roaming repeats the progression across passes, so this can be
+  // longer than the progression itself) — one chip per bar, aligned to the notes.
+  const strip=seq.map(({d},i)=>({num:srcChords[d]?srcChords[d].numLabel:'?',name:srcChords[d]?srcChords[d].name:'',start:i*barLen,end:(i+1)*barLen}));
   // total time is an exact whole number of bars, so a loop wraps on the downbeat
   // with no trailing silence — a perfect, continuous stream.
-  return {notes,duration:bar*barLen};
+  return {notes,duration:bar*barLen,strip};
 }
 
 let arrStyle='chords',arrMotion='static',arrangeLevel='medium',arrBass='octaves';
@@ -1039,7 +1185,7 @@ const STYLE_LBL={chords:'Chords + bass',arpeggio:'Arpeggio',broken:'Broken',all:
 function sendToWaterfall(){
   if(!state.progression.length){toast('Build a progression first — tap some numbers.');return;}
   if(!chords.length){toast('Pick a major or minor scale (7 notes) to arrange chords.');return;}
-  const {notes,duration}=arrange(state.progression,arrStyle,arrMotion,arrangeLevel,arrBass);
+  const {notes,duration,strip}=arrange(state.progression,arrStyle,arrMotion,arrangeLevel,arrBass);
   if(!notes.length){toast('Nothing to arrange for this progression.');return;}
   // CRITICAL: the player's audio scheduler assumes notes are sorted by start time
   // (it breaks the loop at the first note beyond the lookahead), so sort or notes drop.
@@ -1056,9 +1202,9 @@ function sendToWaterfall(){
   player.loop=true;const lp=$('plLoop');if(lp)lp.checked=true;player.seamless=true;
   // carry the Trainer's time signature + tempo so the player metronome matches
   player.metroBeats=state.beats||4;player.metroBeat=60/(state.bpm||100);
-  // chord strip: one chip per chord in the progression, each lasting one bar
-  const barLen=duration/state.progression.length;
-  player.chordStrip=state.progression.map((d,i)=>({num:chords[d]?chords[d].numLabel:'?',name:chords[d]?chords[d].name:'',start:i*barLen,end:(i+1)*barLen}));
+  // chord strip: one chip per BAR (roaming repeats the progression across passes, so use
+  // the arranger's own per-bar strip rather than assuming one bar per progression chord).
+  player.chordStrip=strip;
   renderPlayerChips();
   const pt=document.querySelector('.tab[data-tab="player"]');if(pt)pt.click();
   toast('Sent to Score Player — press ▶ to play the waterfall.');
@@ -1067,7 +1213,7 @@ function sendToWaterfall(){
 // ---- Preview arrangement: ONE clean hit of each chord in the selected style, so you
 // can see the SHAPE (block vs broken vs arpeggio) and the bass choice — no rhythmic
 // repetition. Uses the same voicing as the real arranger so it reads identically.
-function arrangePreview(prog){
+function arrangePreview(prog,srcChords=chords,keyRootName=state.keyRoot){
   const barLen=1;                                   // one time-unit per chord — even spacing
   // The preview intentionally shows ONLY the chord (right-hand block) + the bass note —
   // NOT the free-flowing style (block/broken/arpeggio) or roaming. It's just "here are the
@@ -1075,12 +1221,10 @@ function arrangePreview(prog){
   const useSmooth=state.smooth;
   // Anchor the bass to the tonic so the 1 chord is lowest and degrees stack upward in key
   // order (matches the real arranger). Fixed floor wrapped low pitch classes up an octave.
-  const bassFloor=pcInOctave(pcOf(state.keyRoot),36);
-  const notes=[];let t=0,bar=0,prevTones=null;
+  const bassFloor=pcInOctave(pcOf(keyRootName),36);
+  const notes=[];let t=0,bar=0,prevTones=null,prevPinky=null;
   prog.forEach((d,pi)=>{
-    const c=chords[d];if(!c)return;
-    const lhRoot=pcInOctave(c.rootPc,bassFloor), octUp=lhRoot+12;
-    const iv=chordIntervals(c), fifth=lhRoot+(iv[2]!=null?iv[2]:7);
+    const c=srcChords[d];if(!c)return;
     // RIGHT HAND FIRST — smooth voice-leads chord-to-chord; otherwise root position near C4.
     // The bass is then tucked underneath it, so the two hands never share a key.
     let tones;
@@ -1094,14 +1238,19 @@ function arrangePreview(prog){
     //   root    → just the root note
     //   octaves → root + its octave
     //   root5   → root + the fifth
-    // Then dropped by whole octaves until the thumb sits just below the right hand — so
-    // the bass never lands on a key the chord is using (the "Am looks weird" collision).
-    const bass=tuckBassUnderRH(
+    // The root's OCTAVE is voice-led (chosen nearest the previous bass note) so consecutive
+    // roots stay close and the bass takes the path of least resistance too — same rule the
+    // Score Player uses. That also clears the right hand (no "Am looks weird" collision).
+    const span=arrBass==='octaves'?12:arrBass==='root5'?7:0;
+    const lhRoot=chooseBassRoot(c.rootPc,prevPinky,rhLo,span), octUp=lhRoot+12;
+    const iv=chordIntervals(c), fifth=lhRoot+(iv[2]!=null?iv[2]:7);
+    const bass=
       arrBass==='octaves'
       ? [{m:lhRoot,nm:c.rootName},{m:octUp,nm:c.rootName}]
       : arrBass==='root5'
       ? [{m:lhRoot,nm:c.rootName},{m:fifth,nm:c.rootName}]
-      : [{m:lhRoot,nm:c.rootName}], rhLo);
+      : [{m:lhRoot,nm:c.rootName}];
+    prevPinky=Math.min(...bass.map(b=>b.m));
     bass.forEach(b=>{if(b.m>=ARR_LO&&b.m<=KB_HI)notes.push(ntv(b.m,t,t+barLen*0.98,'L',b.nm));});
     fig.forEach(f=>{if(f.m>=ARR_LO&&f.m<=KB_HI)notes.push(ntv(f.m,t+f.s,t+f.e,'R',null));});
     t+=barLen;bar++;
@@ -1116,14 +1265,21 @@ function renderArrPreview(){
   const panel=$('arrPreviewPanel'),cv=$('arrPreview');if(!panel||!cv)return;
   // The free-flowing (send-to-player) panel appears alongside the preview: both need a progression.
   const ff=$('freeFlowPanel');if(ff)ff.style.display=(state.progression.length&&chords.length)?'block':'none';
+  // the Free-Chords preview shares the arranger settings (style/bass/level/smooth), so keep
+  // it in lockstep whenever these controls change.
+  if(typeof renderFreePreview==='function')renderFreePreview();
   if(!state.progression.length||!chords.length){panel.style.display='none';return;}
   let arr;try{arr=arrangePreview(state.progression);}catch(_){panel.style.display='none';return;}
   if(!arr.notes.length){panel.style.display='none';return;}
   panel.style.display='block';
   const bassLbl=BASS_LBL[arrBass]||'Octaves';
   $('arrPrevMode').textContent=`Chords + ${bassLbl} bass${state.smooth?' · Smooth voicing':''}`;
-  // Static snapshot that looks EXACTLY like the Score Player: full 88-key keyboard
-  // along the bottom, notes falling above it toward the hit line. Fixed 240px tall.
+  drawPreviewCanvas(cv,arr,state.progression.length,i=>chords[state.progression[i]]);
+}
+// Shared waterfall-preview drawing core: full mini keyboard along the bottom, one hit of
+// each chord falling above it. Used by both the diatonic progression preview and the
+// Free-Chords preview so the two look identical. chordForBar(i) returns the chord for bar i.
+function drawPreviewCanvas(cv,arr,bars,chordForBar){
   const H=320;
   const cssW=cv.clientWidth||cv.parentElement.clientWidth||800;
   const dpr=window.devicePixelRatio||1;
@@ -1153,12 +1309,12 @@ function renderArrPreview(){
   // hit line
   ctx.fillStyle='rgba(255,255,255,0.15)';ctx.fillRect(0,fallH-2,W,2);
   // faint bar dividers + a prominent chord name at the left edge of each bar
-  const bars=state.progression.length, barLen=dur/bars;
+  const barLen=dur/bars;
   ctx.strokeStyle='rgba(255,255,255,0.10)';
   for(let i=1;i<bars;i++){const y=yForTime(i*barLen);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
   ctx.textAlign='left';ctx.textBaseline='top';
   for(let i=0;i<bars;i++){
-    const c=chords[state.progression[i]];if(!c)continue;
+    const c=chordForBar(i);if(!c)continue;
     const yTopBar=yForTime((i+1)*barLen);           // top of this bar's band
     ctx.font='bold 17px sans-serif';ctx.fillStyle='#e8ecf6';
     ctx.fillText(c.name,8,yTopBar+5);
@@ -1184,6 +1340,26 @@ function renderArrPreview(){
     const g=ctx.createLinearGradient(0,fallH,0,fallH+bh);g.addColorStop(0,'#39404f');g.addColorStop(1,'#1a1e2a');
     ctx.fillStyle=g;ctx.fillRect(k.x,fallH,k.w,bh);
     ctx.strokeStyle='#12151d';ctx.strokeRect(k.x,fallH,k.w,bh);
+  }
+  // subtle note-name labels on EVERY key (toggle). Spelling follows the chords being
+  // previewed (so F♯ major shows E♯, D♭ shows the flats) and falls back to sharps.
+  if(state.prevNames){
+    const byPc={};
+    for(let i=0;i<bars;i++){const c=chordForBar(i);if(c&&c.tones)c.tones.forEach(t=>{if(byPc[t.pc]==null)byPc[t.pc]=t.name;});}
+    const nameFor=pc=>byPc[pc]!=null?byPc[pc]:CHROMA_SHARP[((pc%12)+12)%12];
+    ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    const fs=Math.max(7,Math.min(11,ww*0.34));
+    // white keys — grey label near the bottom of the key face
+    for(const m in layout){if(layout[m].black)continue;const k=layout[m];
+      ctx.font='600 '+fs+'px sans-serif';ctx.fillStyle='rgba(90,100,120,0.85)';
+      ctx.fillText(nameFor(+m%12),k.x+(k.w-1)/2,fallH+kbH-7);
+    }
+    // black keys — light label near the bottom of the black key
+    const bfs=Math.max(6,Math.min(9,bw*0.42));const bh=kbH*0.62;
+    for(const m in layout){if(!layout[m].black)continue;const k=layout[m];
+      ctx.font='600 '+bfs+'px sans-serif';ctx.fillStyle='rgba(210,216,228,0.9)';
+      ctx.fillText(nameFor(+m%12),k.x+k.w/2,fallH+bh-5);
+    }
   }
 }
 function prRound(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
@@ -1444,8 +1620,10 @@ const SONGS={
    STATE
    ========================================================= */
 const state={keyRoot:'C',type:'major',degree:0,seventh:false,inversion:0,technique:'block',
-  scaleOn:false,chordOn:true,bassOn:false,sheetOn:false,smooth:false,hand:'right',
+  scaleOn:false,chordOn:true,bassOn:false,sheetOn:false,namesOn:false,smooth:false,hand:'right',
   progression:[],loop:false,bpm:100,beats:4,beatsPerChord:4,drum:'none',
+  freeChords:[],freeRoot:4,          // Free-Chords sequence [{pc,qual}] + the currently-armed root (default E)
+  prevNames:false,                    // note-name labels on the Preview waterfall's mini keyboard
   progViewIdx:-1};   // which progression slot is being viewed (for smooth voice-leading on the keyboard); -1 = not a slot
 let scale=null,chords=[],keyEls={};
 const $=id=>document.getElementById(id);
@@ -1469,12 +1647,31 @@ function buildKeyboard(){
     const el=document.createElement('div');el.className='key '+(isB?'black':'white');el.dataset.midi=m;
     if(isB){el.style.left=(wi*W-BW/2)+'px';el.style.width=BW+'px';}
     else{el.style.left=(wi*W)+'px';el.style.width=W+'px';wi++;}
-    el.innerHTML='<div class="bubble"><div class="circ"></div><div class="bn"></div></div><span class="klbl"></span><span class="rmark">R</span>';
+    el.innerHTML='<div class="bubble"><div class="circ"></div><div class="bn"></div></div><span class="klbl"></span><span class="knm"></span><span class="rmark">R</span>';
     el.addEventListener('pointerdown',e=>{e.preventDefault();onKeyPressed(m,true);});
     kb.appendChild(el);keyEls[m]=el;
   }
   kb.style.width=(wi*W)+'px';
+  applyNoteNames();
   centerOnMiddleC();
+}
+// toggle the subtle note-name labels on the trainer keyboard only, spelled for the current key
+function applyNoteNames(){
+  const kb=$('keyboard');if(!kb)return;
+  kb.classList.toggle('show-names',!!state.namesOn);
+  if(!state.namesOn||!keyEls)return;
+  // exact spelling for each pitch class in the current key: the 7 scale tones keep their
+  // real spelling (e.g. E# in F# major), and the 5 non-scale notes fill in as sharps in a
+  // sharp key / flats in a flat key so a reader never sees a contradictory name on a key.
+  const byPc={};
+  if(scale&&scale.notes)scale.notes.forEach(n=>{byPc[n.pc]=noteStr(n);});
+  const flatKey=(scale&&scale.notes?scale.notes:[]).some(n=>n.acc<0);
+  const CHROMA=flatKey?CHROMA_FLAT:CHROMA_SHARP;
+  Object.values(keyEls).forEach(el=>{
+    const pc=(+el.dataset.midi)%12;
+    const lbl=el.querySelector('.knm');
+    if(lbl)lbl.textContent=byPc[pc]!=null?byPc[pc]:CHROMA[pc];
+  });
 }
 // scroll the keyboard wrapper so Middle C sits in the middle of the visible area
 function centerOnMiddleC(){
@@ -1650,6 +1847,7 @@ function renderKeyboard(){
       el.classList.add('show-bub');
     }
   });
+  applyNoteNames();   // keep the subtle per-key note labels spelled for the current key
 }
 function renderTech(){
   const grid=$('techGrid');
@@ -1695,6 +1893,106 @@ function renderPlayStrip(){
   box.querySelectorAll('.ps-chip').forEach(ch=>ch.addEventListener('click',()=>{if(progPlaying)return;livePlay=null;const idx=+ch.dataset.idx;const d=state.progression[idx];state.degree=d;state.inversion=0;state.progViewIdx=idx;syncInv();render();const c=currentChord();if(c)playVoicingTech(chordMidis(),state.technique,1.6);}));
 }
 let psActiveIdx=-1;
+
+/* =========================================================
+   FREE CHORDS — pick any chord in any order (songs that roam across keys).
+   Feeds the SAME arranger/preview/waterfall as the diatonic builder, but the
+   chord list is built from explicit root+quality choices instead of a scale.
+   ========================================================= */
+let freePlaying=false,freeTimer=null,freeLoop=false,freeActiveIdx=-1;
+// materialize the saved [{pc,qual}] sequence into engine-ready chord objects
+function freeChordObjs(){return state.freeChords.map(fc=>makeFreeChord(fc.pc,fc.qual,fc.flat));}
+function renderFreeRoots(){
+  const wrap=$('freeRoots');if(!wrap)return;
+  wrap.innerHTML=CHROMA_SHARP.map((n,pc)=>`<button data-pc="${pc}" class="${pc===state.freeRoot?'on':''}">${n}</button>`).join('');
+  wrap.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{state.freeRoot=+b.dataset.pc;renderFreeRoots();renderFreeQuals();}));
+}
+function renderFreeQuals(){
+  const wrap=$('freeQuals');if(!wrap)return;
+  if(!wrap.dataset.sel)wrap.dataset.sel='maj';
+  wrap.innerHTML=CHORD_QUALITIES.map(q=>`<button data-q="${q.id}" class="${q.id===wrap.dataset.sel?'on':''}" title="${q.long}">${CHROMA_SHARP[state.freeRoot]}${q.label||''}</button>`).join('');
+  wrap.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{wrap.dataset.sel=b.dataset.q;renderFreeQuals();}));
+}
+function renderFreeChips(){
+  const box=$('freeChips');if(!box)return;
+  if(!state.freeChords.length){box.innerHTML='<span class="empty-hint">Pick a root + type, then tap Add…</span>';renderFreePreview();return;}
+  const objs=freeChordObjs();
+  box.innerHTML=objs.map((c,idx)=>`<div class="prog-chip${freePlaying&&idx===freeActiveIdx?' playing':''}" data-idx="${idx}"><button class="x" data-idx="${idx}">×</button><div class="pn">${c.name}</div></div>`).join('');
+  box.querySelectorAll('.x').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();state.freeChords.splice(+x.dataset.idx,1);renderFreeChips();saveURL();}));
+  box.querySelectorAll('.prog-chip').forEach(ch=>ch.addEventListener('click',()=>{if(freePlaying)return;const c=objs[+ch.dataset.idx];if(c)playVoicingTech(smoothVoicing(c.midis,null),state.technique,1.6);}));
+  renderFreePreview();
+}
+function renderFreePreview(){
+  const panel=$('freePrevPanel'),cv=$('freePreview');if(!panel||!cv)return;
+  if(!state.freeChords.length){panel.style.display='none';return;}
+  const objs=freeChordObjs(), prog=objs.map((_,i)=>i), keyRoot=objs[0].rootName;
+  let arr;try{arr=arrangePreview(prog,objs,keyRoot);}catch(_){panel.style.display='none';return;}
+  if(!arr.notes.length){panel.style.display='none';return;}
+  panel.style.display='block';
+  const bassLbl=BASS_LBL[arrBass]||'Octaves';
+  $('freePrevMode').textContent=`Chords + ${bassLbl} bass${state.smooth?' · Smooth voicing':''}`;
+  drawPreviewCanvas(cv,arr,prog.length,i=>objs[i]);
+}
+function freeAdd(){
+  const q=$('freeQuals').dataset.sel||'maj';
+  state.freeChords.push({pc:state.freeRoot,qual:q});
+  renderFreeChips();saveURL();
+}
+function stopFreePlay(){
+  freePlaying=false;freeActiveIdx=-1;
+  if(freeTimer){clearTimeout(freeTimer);freeTimer=null;}
+  const b=$('freePlayBtn');if(b){b.textContent='▶ Play';b.classList.remove('on');}
+  renderFreeChips();
+  if(typeof releaseWakeLock==='function'&&!player.playing)releaseWakeLock();
+}
+// Self-contained playback: step through the free chords, one per (beatsPerChord) beats,
+// smooth voice-led so it sounds musical. Independent of the diatonic scheduler.
+function playFreeChords(){
+  if(freePlaying){stopFreePlay();return;}
+  if(!state.freeChords.length)return;
+  const objs=freeChordObjs();
+  freePlaying=true;freeActiveIdx=-1;
+  const b=$('freePlayBtn');if(b){b.textContent='■ Stop';b.classList.add('on');}
+  if(typeof acquireWakeLock==='function')acquireWakeLock();
+  unlock();
+  const beatDur=60/(state.bpm||100);
+  const chordSec=Math.max(0.5,(state.beatsPerChord||4)*beatDur);
+  let prev=null,i=0;
+  const stepChord=()=>{
+    if(!freePlaying)return;
+    if(i>=objs.length){ if(freeLoop){i=0;prev=null;} else {stopFreePlay();return;} }
+    const c=objs[i];
+    const voicing=state.smooth?smoothVoicing(c.midis,prev):smoothVoicing(c.midis,null);
+    prev=voicing;
+    playVoicingTech(voicing,state.technique,chordSec*0.92);
+    if(state.bassOn){const bn=bassForVoicing(voicing,c.rootPc);if(bn!=null)playMidis([bn],chordSec*0.92,null,false);}
+    freeActiveIdx=i;
+    const box=$('freeChips');if(box){[...box.children].forEach((x,idx)=>x.classList&&x.classList.toggle('playing',idx===freeActiveIdx));}
+    i++;
+    freeTimer=setTimeout(stepChord,chordSec*1000);
+  };
+  stepChord();
+}
+function sendFreeToWaterfall(){
+  if(!state.freeChords.length){toast('Add some chords first.');return;}
+  const objs=freeChordObjs(), prog=objs.map((_,i)=>i), keyRoot=objs[0].rootName;
+  const {notes,duration,strip}=arrange(prog,arrStyle,arrMotion,arrangeLevel,arrBass,objs,keyRoot);
+  if(!notes.length){toast('Nothing to arrange.');return;}
+  notes.sort((a,b)=>a.start-b.start||a.midi-b.midi);
+  player.osmd=null;player.osmdReady=false;player.cursorAnchors=[];
+  $('sheetFollowPanel').style.display='none';
+  const names=objs.map(c=>c.name).join(' ');
+  const motionLbl=arrMotion==='roaming'?'Roaming':(state.smooth?'Smooth':'Static');
+  const modeLbl=`${STYLE_LBL[arrStyle]} · ${motionLbl}`;
+  const lvlLbl=arrangeLevel[0].toUpperCase()+arrangeLevel.slice(1);
+  finishLoad(notes,`Free · ${modeLbl} · ${lvlLbl} — ${names}`,'progression',duration);
+  player.loop=true;const lp=$('plLoop');if(lp)lp.checked=true;player.seamless=true;
+  player.metroBeats=state.beats||4;player.metroBeat=60/(state.bpm||100);
+  player.chordStrip=strip;
+  renderPlayerChips();
+  const pt=document.querySelector('.tab[data-tab="player"]');if(pt)pt.click();
+  toast('Sent to Score Player — press ▶ to play the waterfall.');
+}
 
 /* =========================================================
    SHEET
@@ -1789,9 +2087,9 @@ const buildDots=()=>{$('beatDots').innerHTML=Array.from({length:state.beats},(_,
 function startTransport(){if(transportOn)return;unlock();const ac=audio();nextTime=ac.currentTime+.08;step=0;queue=[];transportOn=true;scheduler();requestAnimationFrame(drawBeats);}
 function stopTransportIfIdle(){if(metroOn||progPlaying)return;transportOn=false;clearTimeout(schedTimer);[...$('beatDots').children].forEach(d=>d.classList.remove('on'));}
 function toggleMetro(){metroOn=!metroOn;$('metroBtn').textContent=metroOn?'■ Stop':'▶ Start';$('metroBtn').classList.toggle('on',metroOn);if(metroOn)startTransport();else stopTransportIfIdle();}
-function playProgression(){if(progPlaying){stopProgression();return;}if(!state.progression.length)return;progPlaying=true;progBaseBeat=null;progPrevVoicing=null;progPrevFingering=null;livePlay=null;setProgBtns(true);startTransport();}
+function playProgression(){if(progPlaying){stopProgression();return;}if(!state.progression.length)return;progPlaying=true;progBaseBeat=null;progPrevVoicing=null;progPrevFingering=null;livePlay=null;setProgBtns(true);if(typeof acquireWakeLock==='function')acquireWakeLock();startTransport();}
 function setProgBtns(on){['playProgBtn','psPlayBtn'].forEach(id=>{const b=$(id);if(b){b.textContent=on?'■ Stop':'▶ Play';b.classList.toggle('on',on);}});}
-function stopProgression(){progPlaying=false;progBaseBeat=null;progPrevFingering=null;livePlay=null;psActiveIdx=-1;setProgBtns(false);[...$('progChips').children].forEach(x=>x.classList.remove('playing'));[...$('psChips').children].forEach(x=>x.classList.remove('playing'));renderKeyboard();stopTransportIfIdle();}
+function stopProgression(){progPlaying=false;progBaseBeat=null;progPrevFingering=null;livePlay=null;psActiveIdx=-1;setProgBtns(false);[...$('progChips').children].forEach(x=>x.classList.remove('playing'));[...$('psChips').children].forEach(x=>x.classList.remove('playing'));renderKeyboard();stopTransportIfIdle();if(typeof releaseWakeLock==='function'&&!player.playing)releaseWakeLock();}
 
 /* =========================================================
    PILLS + INVERSION
@@ -1945,7 +2243,8 @@ function lose(msg){practice.answered=true;practice.streak=0;$('pStreak').textCon
 function saveURL(){
   const s={k:state.keyRoot,t:state.type,d:state.degree,s7:state.seventh?1:0,inv:state.inversion,sm:state.smooth?1:0,
     tech:state.technique,prog:state.progression.join('.'),bpm:state.bpm,drum:state.drum,bpc:state.beatsPerChord,beats:state.beats,
-    hand:state.hand==='left'?'l':'r',loop:state.loop?1:0,tone:currentTone};
+    hand:state.hand==='left'?'l':'r',loop:state.loop?1:0,tone:currentTone,pn:state.prevNames?1:0,
+    free:state.freeChords.map(fc=>fc.pc+'-'+fc.qual+(fc.flat?'b':'')).join('.')};
   const q=Object.entries(s).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
   try{history.replaceState(null,'','#'+q);localStorage.setItem('pianoLab',q);}catch(_){}
 }
@@ -1966,7 +2265,12 @@ function loadURL(){
   if(p.beats)state.beats=+p.beats;
   if(p.hand)state.hand=p.hand==='l'?'left':'right';
   state.loop=p.loop==='1';
+  state.prevNames=p.pn==='1';
   if(p.tone&&TONE_PRESETS[p.tone])currentTone=p.tone;
+  if(p.free)state.freeChords=p.free.split('.').filter(Boolean).map(tok=>{
+    const flat=/b$/.test(tok);const t=flat?tok.slice(0,-1):tok;const[pc,qual]=t.split('-');
+    return {pc:+pc,qual:QUAL_BY_ID[qual]?qual:'maj',flat};
+  });
 }
 function share(){const url=location.href;
   if(navigator.clipboard){navigator.clipboard.writeText(url).then(()=>toast('Link copied — paste to share or reopen')).catch(()=>toast('Copy failed'));}
@@ -1992,6 +2296,8 @@ $('seventhBtn').addEventListener('click',()=>{state.seventh=!state.seventh;state
 pill($('scalePill'),'scaleOn','On','Off',renderKeyboard);
 pill($('chordPill'),'chordOn','On','Off',renderKeyboard);
 pill($('bassPill'),'bassOn','On','Off',()=>{renderKeyboard();renderBanner();});
+// Note names — show a subtle letter on every trainer key (this keyboard only)
+pill($('namesPill'),'namesOn','On','Off',applyNoteNames);
 pill($('sheetPill'),'sheetOn','On','Off',()=>{$('sheetPanel').style.display=state.sheetOn?'block':'none';if(state.sheetOn){renderSheetScale();renderSheetChord();}});
 // keep both Loop pills (in the panel and the big play-strip) visually in sync
 function syncLoopPills(){[$('loopPill'),$('psLoopPill')].forEach(el=>{if(!el)return;el.classList.toggle('on',state.loop);el.querySelector('.st').textContent=state.loop?'On':'Off';});}
@@ -2008,6 +2314,12 @@ $('handTog').querySelectorAll('button').forEach(b=>b.addEventListener('click',()
 $('playProgBtn').addEventListener('click',playProgression);
 $('clearProgBtn').addEventListener('click',()=>{state.progression=[];renderProg();saveURL();});
 $('bpcSel').addEventListener('change',e=>{state.beatsPerChord=+e.target.value;saveURL();});
+// ---- Free Chords wiring ----
+$('freeAddBtn').addEventListener('click',freeAdd);
+$('freePlayBtn').addEventListener('click',playFreeChords);
+$('freeClearBtn').addEventListener('click',()=>{if(freePlaying)stopFreePlay();state.freeChords=[];renderFreeChips();saveURL();});
+$('freeSendBtn').addEventListener('click',sendFreeToWaterfall);
+$('freeLoopPill').addEventListener('click',()=>{freeLoop=!freeLoop;const el=$('freeLoopPill');el.classList.toggle('on',freeLoop);el.querySelector('.st').textContent=freeLoop?'On':'Off';});
 // ---- Progression → waterfall controls ----
 const STYLE_HINTS={
   chords:{easy:'Bass root held in the left hand; right hand plays the block chord. The clean baseline.',
@@ -2317,6 +2629,7 @@ function finishLoad(notes,title,fname,durOverride){
   let d=0;notes.forEach(n=>{if(n.end>d)d=n.end;});
   player.duration=durOverride||d+0.5;
   player.playing=false;player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();
+  if(typeof releaseWakeLock==='function')releaseWakeLock(); // loading a new song stops playback
   player.seamless=false; // only progression arrangements opt into seamless looping
   player.chordStrip=[];player._chipIdx=-1;renderPlayerChips(); // sendToWaterfall repopulates for progressions
   computeBassChanges();
@@ -2359,6 +2672,18 @@ function playerPos(){ // current song seconds
   if(!player.playing)return player.posAtStart;
   const ac=audio();return player.posAtStart+(ac.currentTime-player.startCtxTime)*player.rate;
 }
+// ---- Keep the iPad/laptop screen awake while the waterfall is playing or looping. The
+// Screen Wake Lock API holds the screen on; it's released automatically if the tab is hidden,
+// so we re-acquire it when the tab becomes visible again mid-playback. Silently no-ops on
+// browsers without support (nothing breaks; the screen just sleeps as before).
+let _wakeLock=null;
+async function acquireWakeLock(){
+  try{ if('wakeLock' in navigator && !_wakeLock){ _wakeLock=await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release',()=>{_wakeLock=null;}); } }catch(e){/* denied or unsupported */}
+}
+function releaseWakeLock(){ try{ if(_wakeLock){_wakeLock.release();_wakeLock=null;} }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&(player.playing||(typeof progPlaying!=='undefined'&&progPlaying)))acquireWakeLock(); });
+
 function plPlayPause(){player.playing?plPause():plPlay();}
 function plPlay(){
   if(!player.notes.length)return;unlock();const ac=audio();
@@ -2366,9 +2691,10 @@ function plPlay(){
   player.startCtxTime=ac.currentTime;player.playing=true;
   player.scheduled=0;player.metroScheduled=0; // reschedule audio + clicks from current pos
   $('plPlay').textContent='⏸';$('plPlay').classList.add('on');
+  acquireWakeLock();                          // hold the screen on while playing/looping
   cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
 }
-function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();}
+function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();releaseWakeLock();}
 function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
 function clearLitAll(){for(let m=KB_LO;m<=KB_HI;m++)litOff(m);}
 
@@ -2587,6 +2913,7 @@ function wirePlayer(){
   $('plLoop').addEventListener('change',e=>{player.loop=e.target.checked;});
   $('plMetro').addEventListener('change',e=>{player.metro=e.target.checked;player.metroScheduled=0;});
   $('plNames').addEventListener('change',e=>{player.showNames=e.target.checked;player.draw();});
+  $('prevNames').addEventListener('change',e=>{state.prevNames=e.target.checked;saveURL();renderArrPreview();});
   $('plPedal').addEventListener('change',e=>{player.pedalOn=e.target.checked;});
   $('plWait').addEventListener('click',()=>{player.wait=!player.wait;$('plWait').textContent='🎹 Wait-for-me mode: '+(player.wait?'On':'Off');$('plWait').classList.toggle('primary',player.wait);if(player.wait&&$('midiStatus').className.indexOf('on')<0)toast('Connect your piano (Trainer tab) so it can wait for you');});
   window.addEventListener('resize',()=>{if($('page-player').classList.contains('active')){player.resize();player.draw();}if($('page-trainer').classList.contains('active'))renderArrPreview();});
@@ -2597,6 +2924,7 @@ function playerFeedNote(midi){if(player.wait&&player.playing){player.waitSatisfi
 /* init */
 loadURL();
 fillTypeSeg();fillDrumSeg();buildKeyboard();buildDots();render();
+renderFreeRoots();renderFreeQuals();renderFreeChips();
 wirePlayer();
 // collapsible panels: click the heading to fold the whole section away
 document.querySelectorAll('.panel.collapsible>h2[data-collapse]').forEach(h=>{
@@ -2609,6 +2937,7 @@ $('bpmSlider').value=state.bpm;$('bpmVal').textContent=state.bpm;
 $('beatsSel').value=state.beats;$('bpcSel').value=state.beatsPerChord;buildDots();
 // reflect restored fingering hand + loop state
 $('handTog').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.hand===state.hand));
+if($('prevNames'))$('prevNames').checked=!!state.prevNames;
 syncLoopPills();
 // piano-tone selector: populate + switch live so you can A/B grand sounds
 (function(){const sel=$('toneSel');if(!sel)return;
