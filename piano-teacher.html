@@ -217,6 +217,37 @@
   .prog-lib select:hover{border-color:var(--indigo)}
   .prog-info{font-size:13px;color:var(--muted);margin:0 0 4px;min-height:18px;line-height:1.4}
   .prog-info b{color:var(--text)}
+  /* ---- Chord Fluency ---- */
+  .fl-setup{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .fl-setup .ctl{flex:1 1 140px;min-width:120px}
+  .fl-setup .ctl label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+  .fl-setup select{width:100%;appearance:none;-webkit-appearance:none;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;font-weight:700;cursor:pointer}
+  .fl-setup select:hover{border-color:var(--indigo)}
+  .fl-progline{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 4px;align-items:center;min-height:34px}
+  .fl-progline .flc{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-weight:800;font-size:15px}
+  .fl-progline .flc.on{background:linear-gradient(180deg,#5b6ee1,#4453c9);border-color:#4453c9;color:#fff}
+  .fl-progline .flc .sub{font-size:11px;color:var(--muted);font-weight:600;margin-left:5px}
+  .fl-progline .flc.on .sub{color:#d3d9ff}
+  .fl-groove-desc{font-size:13px;color:var(--muted);line-height:1.45;margin-top:4px}
+  .fl-groove-desc b{color:var(--text)}
+  /* rhythm grid */
+  .fl-grid{display:grid;gap:4px;font-variant-numeric:tabular-nums}
+  .fl-grid .fl-row{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:8px}
+  .fl-grid .fl-rowlbl{font-size:12px;font-weight:800;color:var(--muted);text-align:right}
+  .fl-grid .fl-cells{display:grid;gap:4px}
+  .fl-grid .fl-cell{height:30px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted);position:relative}
+  .fl-grid .fl-cell.beat{border-color:#3a4257}
+  .fl-grid .fl-cell.lh{background:linear-gradient(180deg,#7d5be1,#5f43c9);border-color:#5f43c9;color:#fff}
+  .fl-grid .fl-cell.rh{background:linear-gradient(180deg,#5b6ee1,#4453c9);border-color:#4453c9;color:#fff}
+  .fl-grid .fl-cell.rh.nxt{background:linear-gradient(180deg,#e1a15b,#c98443);border-color:#c98443;color:#fff}
+  .fl-grid .fl-cell.playing{outline:2px solid #fff;outline-offset:1px}
+  .fl-grid .fl-countrow .fl-cell{height:20px;background:transparent;border:none;color:var(--muted);font-size:11px}
+  .fl-nowcards{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .fl-card{flex:1 1 200px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+  .fl-card.next{opacity:.75}
+  .fl-card-lbl{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.08em}
+  .fl-card-chord{font-size:28px;font-weight:800;margin:2px 0}
+  .fl-card-notes{font-size:14px;color:var(--muted);font-weight:600}
   .songbtns button{font-size:12px;padding:8px 12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:20px;cursor:pointer}
   .songbtns button:hover{border-color:var(--indigo)}
   .songbtns{display:flex;gap:7px;flex-wrap:wrap}
@@ -342,6 +373,7 @@
 
   <div class="tabbar">
     <button class="tab active" data-tab="trainer">Trainer</button>
+    <button class="tab" data-tab="fluency">Chord Fluency</button>
     <button class="tab" data-tab="player">Score Player</button>
   </div>
 
@@ -623,6 +655,43 @@
   </div>
 
   </div><!-- /page-trainer -->
+
+  <!-- ============ CHORD FLUENCY TAB ============ -->
+  <div class="tabpage" id="page-fluency">
+    <div class="panel">
+      <h2>Chord Fluency</h2>
+      <p class="muted" style="margin:-4px 0 12px">Pick a progression and a <b>genre groove</b> to hear exactly what the left hand and right hand play, and on which beats. This is the "how do I actually play this like a real song" layer.</p>
+      <div class="fl-setup">
+        <div class="ctl"><label>Key</label><select id="flKeySel"></select></div>
+        <div class="ctl"><label>Scale</label><select id="flTypeSel"></select></div>
+        <div class="ctl"><label>Genre</label><select id="flGenreSel"></select></div>
+        <div class="ctl"><label>Progression</label><select id="flProgSel"></select></div>
+        <div class="ctl"><label>Groove</label><select id="flGrooveSel"></select></div>
+        <div class="ctl"><label>Tempo</label><select id="flBpmSel"></select></div>
+      </div>
+      <div class="fl-progline" id="flProgLine"></div>
+      <div class="fl-groove-desc" id="flGrooveDesc"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="action primary" id="flPlayBtn">▶ Play</button>
+        <div class="pill blue" id="flLoopPill" style="padding:8px 14px;cursor:pointer"><span class="ind"></span>Loop <span class="st">On</span></div>
+        <label class="chk"><input type="checkbox" id="flDrumChk" checked><span>🥁</span>Drums</label>
+        <label class="chk"><input type="checkbox" id="flLHChk" checked><span>🤚</span>Left hand</label>
+        <label class="chk"><input type="checkbox" id="flRHChk" checked><span>✋</span>Right hand</label>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 style="margin-bottom:6px">The Groove — one bar</h2>
+      <p class="muted" id="flGridHint" style="margin:-2px 0 12px">Dots show when each hand plays. The right hand's last hit can be the <b>next</b> chord, played early — the "push."</p>
+      <div class="fl-grid" id="flGrid"></div>
+    </div>
+    <div class="panel">
+      <div class="fl-nowcards">
+        <div class="fl-card" id="flCurCard"><div class="fl-card-lbl">CURRENT</div><div class="fl-card-chord" id="flCurChord">—</div><div class="fl-card-notes" id="flCurNotes"></div></div>
+        <div class="fl-card next" id="flNextCard"><div class="fl-card-lbl">NEXT</div><div class="fl-card-chord" id="flNextChord">—</div><div class="fl-card-notes" id="flNextNotes"></div></div>
+      </div>
+      <div class="kb-wrap"><div class="keyboard" id="flKeyboard"></div></div>
+    </div>
+  </div><!-- /page-fluency -->
 
   <!-- ============ SCORE PLAYER TAB ============ -->
   <div class="tabpage" id="page-player">
@@ -1581,10 +1650,11 @@ function voice(freq,when,dur,vol){const ac=audio();
     click.connect(cf);cf.connect(cg);cg.connect(out);click.start(when);click.stop(when+.04);
   }
 }
-function playMidis(midis,dur=1.6,when=null,litFlash=true){unlock();const ac=audio();const t=when??ac.currentTime;
-  const vel=Math.max(.35,.85/Math.sqrt(midis.length));
-  const vol=Math.max(.08,.42/Math.sqrt(midis.length));
-  midis.forEach(m=>{ if(!pianoNote(m,t,dur,vel)) voice(midiToFreq(m),t,dur,vol); });
+function playMidis(midis,dur=1.6,when=null,litFlash=true,velOverride=null){unlock();const ac=audio();const t=when??ac.currentTime;
+  const autoVel=Math.max(.35,.85/Math.sqrt(midis.length));
+  const vel=velOverride==null?autoVel:Math.max(.05,Math.min(1,velOverride));
+  const vol=Math.max(.08,.42/Math.sqrt(midis.length))*(velOverride==null?1:velOverride/autoVel);
+  midis.forEach(m=>{ if(!pianoNote(m,t,dur,vel)) voice(midiToFreq(m),t,dur,Math.max(.04,vol)); });
   if(litFlash)scheduleLit(midis,t,dur);}
 // play a chord using the current technique
 function playChordTech(midis,tech,inv,beatDur,when=null){
@@ -1632,6 +1702,77 @@ const DRUM_PATTERNS={
   ballad:  {name:'Ballad',     rows:{K:'K---------------',S:'--------S-------',h:'h---h---h---h---'}}, // gentle: K 1 · S 3 · quarter hats
 };
 ['pointerdown','touchstart','keydown'].forEach(ev=>window.addEventListener(ev,function once(){unlock();},{once:true,passive:true}));
+
+/* =========================================================
+   GENRE GROOVES — bar-level LH/RH rhythmic patterns (Chord Fluency)
+   A groove answers "what does each hand play, and on which beat?" for a
+   whole measure — unlike TECHNIQUES, which only order the notes of one chord.
+   Each event: {at:<beat 0..3.99>, sel:<note selector>, dur:<beats>, vel, ref}
+     at   — beat offset within the bar. 0=beat1, 1=beat2, 1.5="& of 2", 2.5="& of 3"…
+     sel  — semantic note picker resolved against the current chord's voicing:
+            'root' 'fifth' 'octave' 'root5' 'chord' 'shell37'
+     dur  — note length in beats (short = staccato stab)
+     ref  — 'current' (default) or 'next' → the anticipated "push" chord
+   `swing` (0..~0.66) delays every off-beat "&" toward a triplet feel.
+   `drum` names the DRUM_PATTERNS groove that fits. Kept intentionally simple.
+   ========================================================= */
+const GROOVE_PATTERNS={
+  none:{name:'None (block chords)',genre:'—',bpm:100,drum:'none',swing:0,desc:'No groove — plays each chord as a plain block on beat 1, like the Trainer.',LH:null,RH:null},
+  pop_pulse:{name:'Pop — Quarter Pulse',genre:'Pop',bpm:96,drum:'poprock',swing:0,
+    desc:'<b>LH</b> anchors the harmony: root on <b>1</b>, fifth on <b>3</b>. <b>RH</b> keeps a steady quarter-note chord on every beat. The clearest way to hear a progression.',
+    LH:[{at:0,sel:'root',dur:1.8,vel:.88},{at:2,sel:'fifth',dur:1.8,vel:.72}],
+    RH:[{at:0,sel:'chord',dur:.8,vel:.82},{at:1,sel:'chord',dur:.8,vel:.7},{at:2,sel:'chord',dur:.8,vel:.78},{at:3,sel:'chord',dur:.8,vel:.7}]},
+  pop_ballad:{name:'Pop Ballad — Broken 8ths',genre:'Pop',bpm:80,drum:'ballad',swing:0,
+    desc:'<b>LH</b> holds the root under the bar. <b>RH</b> rolls a repeating low-high-mid-high broken pattern in eighth notes — makes simple chords sound full.',
+    LH:[{at:0,sel:'root',dur:3.8,vel:.8}],
+    RH:[{at:0,sel:'bottom',dur:.45,vel:.8},{at:.5,sel:'top',dur:.45,vel:.66},{at:1,sel:'mid',dur:.45,vel:.7},{at:1.5,sel:'top',dur:.45,vel:.64},{at:2,sel:'bottom',dur:.45,vel:.78},{at:2.5,sel:'top',dur:.45,vel:.66},{at:3,sel:'mid',dur:.45,vel:.7},{at:3.5,sel:'top',dur:.45,vel:.64}]},
+  rock_backbeat:{name:'Rock — Backbeat Chords',genre:'Rock',bpm:100,drum:'rock',swing:0,
+    desc:'<b>LH</b> root octave drives beats <b>1</b> and <b>3</b>. <b>RH</b> punches short chord hits on the backbeat — <b>2</b> and <b>4</b> — locked with the snare.',
+    LH:[{at:0,sel:'octave',dur:.9,vel:.9},{at:2,sel:'octave',dur:.9,vel:.85}],
+    RH:[{at:1,sel:'chord',dur:.55,vel:.84},{at:3,sel:'chord',dur:.55,vel:.84}]},
+  soul_push:{name:'Soul / R&B — Backbeat + Push',genre:'R&B / Soul',bpm:76,drum:'backbeat',swing:0,
+    desc:'<b>LH</b> root on <b>1</b>, fifth on <b>3</b>. <b>RH</b> answers on <b>2</b> and <b>4</b>, then the <b>next</b> chord arrives early on the "& of 4" — the signature soul <b>push</b>.',
+    LH:[{at:0,sel:'root',dur:1.8,vel:.86},{at:2,sel:'fifth',dur:1.5,vel:.68}],
+    RH:[{at:1,sel:'chord',dur:.65,vel:.76},{at:3,sel:'chord',dur:.45,vel:.82},{at:3.5,sel:'chord',dur:1.0,vel:.74,ref:'next'}]},
+  funk_stabs:{name:'Funk — Syncopated Stabs',genre:'Funk',bpm:100,drum:'boombap',swing:0,
+    desc:'<b>LH</b> short root notes on the grid. <b>RH</b> detached 16th-note chord stabs with rests between — the rests matter as much as the notes.',
+    LH:[{at:0,sel:'root',dur:.3,vel:.92},{at:1.5,sel:'octave',dur:.25,vel:.72},{at:2.5,sel:'root',dur:.3,vel:.82}],
+    RH:[{at:.5,sel:'chord',dur:.18,vel:.82},{at:1.5,sel:'chord',dur:.18,vel:.74},{at:2.25,sel:'chord',dur:.18,vel:.78},{at:3.5,sel:'chord',dur:.18,vel:.84}]},
+  jazz_comp:{name:'Jazz — 2 & 4 Comping',genre:'Jazz',bpm:120,drum:'none',swing:.5,
+    desc:'<b>LH</b> plays a root-and-7th <b>shell</b> on <b>1</b> and <b>3</b>. <b>RH</b> comps the chord on <b>2</b> and <b>4</b>, slightly detached, with a swing feel.',
+    LH:[{at:0,sel:'shell37',dur:.9,vel:.72},{at:2,sel:'shell37',dur:.9,vel:.7}],
+    RH:[{at:1,sel:'chord',dur:.5,vel:.78},{at:3,sel:'chord',dur:.5,vel:.78}]},
+  blues_shuffle:{name:'Blues — Shuffle Bass',genre:'Blues',bpm:96,drum:'rock',swing:.5,
+    desc:'<b>LH</b> shuffles root→fifth in a swung triplet pulse. <b>RH</b> stabs the chord on <b>2</b> and <b>4</b>. (Add 7ths by ear for the bluesy color.)',
+    LH:[{at:0,sel:'root',dur:.4,vel:.86},{at:.5,sel:'fifth',dur:.4,vel:.7},{at:1,sel:'root',dur:.4,vel:.82},{at:1.5,sel:'fifth',dur:.4,vel:.66},{at:2,sel:'root',dur:.4,vel:.84},{at:2.5,sel:'fifth',dur:.4,vel:.68},{at:3,sel:'root',dur:.4,vel:.82},{at:3.5,sel:'fifth',dur:.4,vel:.66}],
+    RH:[{at:1,sel:'chord',dur:.4,vel:.78},{at:3,sel:'chord',dur:.4,vel:.78}]},
+  country_boom:{name:'Country — Boom-Chick',genre:'Folk / Country',bpm:104,drum:'backbeat',swing:0,
+    desc:'The clearest "hands don\'t land together" lesson: <b>LH</b> root on <b>1</b>, fifth on <b>3</b> (the "boom"); <b>RH</b> chord on <b>2</b> and <b>4</b> (the "chick").',
+    LH:[{at:0,sel:'root',dur:.7,vel:.88},{at:2,sel:'fifth',dur:.7,vel:.74}],
+    RH:[{at:1,sel:'chord',dur:.5,vel:.78},{at:3,sel:'chord',dur:.5,vel:.78}]},
+};
+// Resolve a semantic selector against a chord to concrete MIDI note(s).
+//  rhVoicing = the smooth RH voicing (sorted low→high); c = chord object; prevBass = previous LH pinky midi.
+function grooveResolve(sel,c,rhVoicing,prevBass,rhLo){
+  const iv=chordIntervals(c);                              // e.g. [0,4,7] or [0,4,7,10]
+  const fifthIv=iv.find(x=>x===7)!=null?7:(iv[2]||7);
+  const seventhIv=iv.find(x=>x===10||x===11);
+  const bassRoot=chooseBassRoot(c.rootPc,prevBass,rhLo,sel==='octave'?12:sel==='root5'?7:0);
+  switch(sel){
+    case 'root':   return [bassRoot];
+    case 'fifth':  return [bassRoot+fifthIv];
+    case 'octave': return [bassRoot,bassRoot+12];
+    case 'root5':  return [bassRoot,bassRoot+fifthIv];
+    case 'shell37':return seventhIv!=null?[bassRoot,bassRoot+seventhIv]:[bassRoot,bassRoot+fifthIv];
+    case 'chord':  return rhVoicing.slice();
+    case 'bottom': return [rhVoicing[0]];
+    case 'top':    return [rhVoicing[rhVoicing.length-1]];
+    case 'mid':    return [rhVoicing[Math.floor(rhVoicing.length/2)]||rhVoicing[0]];
+    default:       return rhVoicing.slice();
+  }
+}
+// apply swing: push an off-beat "&" (fractional .5 within a beat) later toward a triplet
+function grooveSwing(at,swing){if(!swing)return at;const frac=at-Math.floor(at);if(Math.abs(frac-0.5)<1e-6)return Math.floor(at)+0.5+swing*(2/3-0.5)*2;return at;}
 
 /* =========================================================
    SONG LIBRARY — real pop/rock progressions (degree indexes)
@@ -1708,8 +1849,9 @@ const state={keyRoot:'C',type:'major',degree:0,seventh:false,inversion:0,techniq
   progression:[],loop:false,bpm:100,beats:4,beatsPerChord:4,drum:'none',
   freeChords:[],freeRoot:4,          // Free-Chords sequence [{pc,qual}] + the currently-armed root (default E)
   prevNames:false,                    // note-name labels on the Preview waterfall's mini keyboard
-  progViewIdx:-1};   // which progression slot is being viewed (for smooth voice-leading on the keyboard); -1 = not a slot
-let scale=null,chords=[],keyEls={};
+  progViewIdx:-1,   // which progression slot is being viewed (for smooth voice-leading on the keyboard); -1 = not a slot
+  fluency:{groove:'none',genre:'Pop',progIdx:0,bpm:96,drums:true,lh:true,rh:true,loop:true}};
+let scale=null,chords=[],keyEls={},flKeyEls={};
 const $=id=>document.getElementById(id);
 
 /* =========================================================
@@ -2358,7 +2500,9 @@ function saveURL(){
   const s={k:state.keyRoot,t:state.type,d:state.degree,s7:state.seventh?1:0,inv:state.inversion,sm:state.smooth?1:0,
     tech:state.technique,prog:state.progression.join('.'),bpm:state.bpm,drum:state.drum,bpc:state.beatsPerChord,beats:state.beats,
     hand:state.hand==='left'?'l':'r',loop:state.loop?1:0,tone:currentTone,pn:state.prevNames?1:0,
-    free:state.freeChords.map(fc=>fc.pc+'-'+fc.qual+(fc.flat?'b':'')).join('.')};
+    free:state.freeChords.map(fc=>fc.pc+'-'+fc.qual+(fc.flat?'b':'')).join('.'),
+    fg:state.fluency.groove,fgn:state.fluency.genre,fpi:state.fluency.progIdx,fk:flKeyRoot,fbpm:state.fluency.bpm,
+    ffl:(state.fluency.drums?'d':'')+(state.fluency.lh?'l':'')+(state.fluency.rh?'r':'')+(state.fluency.loop?'o':'')};
   const q=Object.entries(s).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
   try{history.replaceState(null,'','#'+q);localStorage.setItem('pianoLab',q);}catch(_){}
 }
@@ -2385,6 +2529,13 @@ function loadURL(){
     const flat=/b$/.test(tok);const t=flat?tok.slice(0,-1):tok;const[pc,qual]=t.split('-');
     return {pc:+pc,qual:QUAL_BY_ID[qual]?qual:'maj',flat};
   });
+  // fluency tab state (optional; safe on old links that lack these keys)
+  if(p.fg&&GROOVE_PATTERNS[p.fg])state.fluency.groove=p.fg;
+  if(p.fgn&&PROGRESSION_LIBRARY[p.fgn])state.fluency.genre=p.fgn;
+  if(p.fpi!=null&&p.fpi!=='')state.fluency.progIdx=+p.fpi||0;
+  if(p.fk)flKeyRoot=p.fk;
+  if(p.fbpm)state.fluency.bpm=+p.fbpm;
+  if(p.ffl!=null){state.fluency.drums=/d/.test(p.ffl);state.fluency.lh=/l/.test(p.ffl);state.fluency.rh=/r/.test(p.ffl);state.fluency.loop=/o/.test(p.ffl);}
 }
 function share(){const url=location.href;
   if(navigator.clipboard){navigator.clipboard.writeText(url).then(()=>toast('Link copied — paste to share or reopen')).catch(()=>toast('Copy failed'));}
@@ -2494,13 +2645,222 @@ function fillDrumSeg(){
 }
 
 /* =========================================================
+   CHORD FLUENCY — genre grooves practice tab.
+   Self-contained: builds its own chord list from the selected key/scale +
+   progression-library entry, renders a rhythm grid, and runs its OWN small
+   look-ahead scheduler that reuses the low-level primitives (playMidis,
+   playDrum, smoothVoicing, chooseBassRoot, chordIntervals). It deliberately
+   does NOT touch the Trainer transport, so nothing there can regress. Only one
+   clock runs at a time (starting Fluency stops the Trainer transport).
+   ========================================================= */
+let flChords=[],flProg=[],flKeyRoot='C',flType='major';
+let flPlaying=false,flTimer=null,flNextTime=0,flStep=0,flQueue=[],flBaseStep=0;
+let flVoicePath=[];  // precomputed smooth voicing per progression slot (with bass pinky)
+const FL_BPMS=[60,66,72,76,80,88,96,104,112,120,132];
+
+function buildFlKeyboard(){
+  const kb=$('flKeyboard');if(!kb)return;kb.innerHTML='';flKeyEls={};
+  const W=42,BW=27,blackPCs=[1,3,6,8,10];let wi=0;
+  for(let m=KB_LO;m<=KB_HI;m++){
+    const pc=m%12,isB=blackPCs.includes(pc);
+    const el=document.createElement('div');el.className='key '+(isB?'black':'white');el.dataset.midi=m;
+    if(isB){el.style.left=(wi*W-BW/2)+'px';el.style.width=BW+'px';}
+    else{el.style.left=(wi*W)+'px';el.style.width=W+'px';wi++;}
+    el.innerHTML='<div class="bubble"><div class="circ"></div><div class="bn"></div></div><span class="klbl"></span><span class="knm"></span><span class="rmark">R</span>';
+    kb.appendChild(el);flKeyEls[m]=el;
+  }
+  kb.style.width=(wi*W)+'px';
+}
+// flash a set of midis on the fluency keyboard for `ms`
+function flLit(midis,when,dur){
+  const ac=audio();const delay=Math.max(0,(when-ac.currentTime)*1000);
+  setTimeout(()=>{midis.forEach(m=>{let v=m;while(v<KB_LO)v+=12;while(v>KB_HI)v-=12;const el=flKeyEls[v];if(el){el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),Math.max(120,dur*1000*0.9));}});},delay);
+}
+
+// rebuild flChords + flProg from the current key/scale + selected library progression
+function flRebuild(){
+  const genre=state.fluency.genre, list=PROGRESSION_LIBRARY[genre]||PROGRESSION_LIBRARY['Pop'];
+  const p=list[state.fluency.progIdx]||list[0];
+  flType=(p&&SCALE_DEFS[p.type])?p.type:'major';
+  const rs=rootSetFor(flType);
+  if(!rs.includes(flKeyRoot))flKeyRoot=nearestRoot(flKeyRoot,rs);
+  const sc=spellScale(flKeyRoot,flType);
+  flChords=buildChords(sc,!!(p&&p.seventh));
+  flProg=(p?p.degrees:[0,4,5,3]).filter(d=>d<flChords.length);
+  // precompute the smooth voicing path (RH) + bass pinky per slot, memoized like the arranger
+  flVoicePath=[];const memo={};let prevV=null,prevPinky=null;
+  flProg.forEach(d=>{
+    const c=flChords[d];if(!c){flVoicePath.push(null);return;}
+    const k=c.midis.join(',');
+    let v=memo[k];if(!v){v=smoothVoicing(c.midis,prevV).slice().sort((a,b)=>a-b);memo[k]=v.slice();}
+    prevV=v;
+    const rhLo=Math.min(...v);
+    const pinky=chooseBassRoot(c.rootPc,prevPinky,rhLo,12);prevPinky=pinky;
+    flVoicePath.push({c,voicing:v,pinky});
+  });
+}
+function flChordName(i){const it=flVoicePath[i%flVoicePath.length];return it?it.c.name:'—';}
+
+function renderFlSetup(){
+  // key + scale reflect the selected progression (scale is read-only info: the preset drives it)
+  const kSel=$('flKeySel');if(kSel){const rs=rootSetFor(flType);kSel.innerHTML=rs.map(r=>`<option${r===flKeyRoot?' selected':''}>${r}</option>`).join('');}
+  const tSel=$('flTypeSel');if(tSel){tSel.innerHTML=Object.entries(SCALE_DEFS).map(([k,v])=>`<option value="${k}"${k===flType?' selected':''}>${v.name}</option>`).join('');}
+  const gSel=$('flGenreSel');if(gSel)gSel.innerHTML=Object.keys(PROGRESSION_LIBRARY).map(g=>`<option${g===state.fluency.genre?' selected':''}>${g}</option>`).join('');
+  const pSel=$('flProgSel');if(pSel){const list=PROGRESSION_LIBRARY[state.fluency.genre]||[];pSel.innerHTML=list.map((p,i)=>`<option value="${i}"${i===state.fluency.progIdx?' selected':''}>${p.name} · ${p.pat}</option>`).join('');}
+  const grSel=$('flGrooveSel');if(grSel)grSel.innerHTML=Object.entries(GROOVE_PATTERNS).map(([k,g])=>`<option value="${k}"${k===state.fluency.groove?' selected':''}>${g.name}</option>`).join('');
+  const bSel=$('flBpmSel');if(bSel)bSel.innerHTML=FL_BPMS.map(b=>`<option value="${b}"${b===state.fluency.bpm?' selected':''}>${b} BPM</option>`).join('');
+  $('flDrumChk').checked=state.fluency.drums;$('flLHChk').checked=state.fluency.lh;$('flRHChk').checked=state.fluency.rh;
+  const lp=$('flLoopPill');if(lp){lp.classList.toggle('on',state.fluency.loop);lp.querySelector('.st').textContent=state.fluency.loop?'On':'Off';}
+}
+function renderFlProgLine(){
+  const box=$('flProgLine');if(!box)return;
+  box.innerHTML=flProg.map((d,i)=>{const c=flChords[d];if(!c)return'';return `<div class="flc" data-i="${i}"><span>${c.numLabel}</span><span class="sub">${c.name}</span></div>`;}).join('');
+}
+function renderFlGrooveDesc(){
+  const g=GROOVE_PATTERNS[state.fluency.groove]||GROOVE_PATTERNS.none;
+  $('flGrooveDesc').innerHTML=g.desc||'';
+}
+// draw the one-bar rhythm grid from the actual groove events (16 sixteenth cells)
+function renderFlGrid(){
+  const box=$('flGrid');if(!box)return;
+  const g=GROOVE_PATTERNS[state.fluency.groove]||GROOVE_PATTERNS.none;
+  const COUNT=['1','e','&','a','2','e','&','a','3','e','&','a','4','e','&','a'];
+  const cell=(txt,cls)=>`<div class="fl-cell ${cls||''}">${txt||''}</div>`;
+  const beatCells=arr=>{const on=new Array(16).fill(null);
+    (arr||[]).forEach(ev=>{const step=Math.round(ev.at*4);if(step>=0&&step<16)on[step]=ev;});
+    return on;};
+  const rowHtml=(lbl,arr,kind)=>{
+    const on=beatCells(arr);
+    const cells=on.map((ev,i)=>{
+      if(ev){const nxt=ev.ref==='next'?' nxt':'';return `<div class="fl-cell ${kind}${nxt}" data-step="${i}">${kind==='lh'?'●':(ev.ref==='next'?'▶':'●')}</div>`;}
+      const beat=i%4===0;return `<div class="fl-cell${beat?' beat':''}"></div>`;
+    }).join('');
+    return `<div class="fl-row"><div class="fl-rowlbl">${lbl}</div><div class="fl-cells" style="grid-template-columns:repeat(16,1fr)">${cells}</div></div>`;
+  };
+  const countRow=`<div class="fl-row fl-countrow"><div class="fl-rowlbl"></div><div class="fl-cells" style="grid-template-columns:repeat(16,1fr)">${COUNT.map((t,i)=>cell(t)).join('')}</div></div>`;
+  if(!g.LH&&!g.RH){box.innerHTML='<p class="muted" style="margin:0">No groove selected — pick one above to see the pattern.</p>';return;}
+  box.innerHTML=countRow+rowHtml('LH 🤚',g.LH,'lh')+rowHtml('RH ✋',g.RH,'rh');
+}
+function renderFlCards(curIdx){
+  const cur=flVoicePath[curIdx%flVoicePath.length], nxt=flVoicePath[(curIdx+1)%flVoicePath.length];
+  const nm=m=>CHROMA_SHARP[((m%12)+12)%12];
+  if(cur){$('flCurChord').textContent=cur.c.name;$('flCurNotes').textContent=cur.voicing.map(nm).join(' ');}
+  if(nxt){$('flNextChord').textContent=nxt.c.name;$('flNextNotes').textContent=nxt.voicing.map(nm).join(' ');}
+}
+function renderFluency(){flRebuild();renderFlSetup();renderFlProgLine();renderFlGrooveDesc();renderFlGrid();renderFlCards(0);saveURL();}
+
+/* ---- Fluency scheduler (independent clock; reuses primitives) ---- */
+function flStop(){
+  flPlaying=false;clearTimeout(flTimer);flTimer=null;flQueue=[];
+  const b=$('flPlayBtn');if(b){b.textContent='▶ Play';b.classList.remove('on');}
+  Object.values(flKeyEls).forEach(el=>el.classList.remove('lit'));
+  [...$('flGrid').querySelectorAll('.fl-cell.playing')].forEach(c=>c.classList.remove('playing'));
+  if(typeof releaseWakeLock==='function'&&!progPlaying&&!(window.player&&player.playing))releaseWakeLock();
+}
+function flStart(){
+  if(flPlaying){flStop();return;}
+  if(!flProg.length)return;
+  // enforce single transport: stop the Trainer clock if it's running
+  if(progPlaying)stopProgression();if(metroOn){metroOn=false;const mb=$('metroBtn');if(mb){mb.textContent='▶ Start';mb.classList.remove('on');}}
+  stopTransportIfIdle();
+  unlock();const ac=audio();
+  state.bpm=state.fluency.bpm;
+  flPlaying=true;flStep=0;flQueue=[];flNextTime=ac.currentTime+0.1;flBaseStep=0;
+  const b=$('flPlayBtn');if(b){b.textContent='■ Stop';b.classList.add('on');}
+  if(typeof acquireWakeLock==='function')acquireWakeLock();
+  flScheduler();requestAnimationFrame(flDraw);
+}
+function flScheduler(){
+  if(!flPlaying)return;
+  const ac=audio();const beatDur=60/state.fluency.bpm;const stepDur=beatDur/4;  // 16th grid
+  const g=GROOVE_PATTERNS[state.fluency.groove]||GROOVE_PATTERNS.none;
+  const bars=flProg.length;                    // one chord per bar
+  while(flNextTime<ac.currentTime+0.16){
+    const s16=((flStep%16)+16)%16;
+    const barAbs=Math.floor(flStep/16);
+    const slot=((barAbs%bars)+bars)%bars;
+    const item=flVoicePath[slot];
+    // stop at end if not looping
+    if(!state.fluency.loop&&barAbs>=bars){flQueue.push({type:'end',time:flNextTime});break;}
+    if(s16===0)flQueue.push({type:'bar',slot,time:flNextTime});
+    if(item){
+      const prevItem=flVoicePath[((slot-1)%bars+bars)%bars];
+      const nextItem=flVoicePath[(slot+1)%bars];
+      if(!g.LH&&!g.RH){
+        // "none" groove: plain block chord on the downbeat, like the Trainer
+        if(s16===0){flQueue.push({type:'play',hand:'rh',midis:item.voicing.slice(),dur:beatDur*3.8,vel:.8,time:flNextTime,step:0});}
+      }else{
+        const fire=(arr,hand)=>{if(!arr)return;arr.forEach(ev=>{
+          const at=grooveSwing(ev.at,g.swing);
+          const evStep=Math.round(at*4);
+          if(evStep!==s16)return;
+          const useItem=ev.ref==='next'?nextItem:item;if(!useItem)return;
+          const prevPinky=prevItem?prevItem.pinky:null;
+          let midis=grooveResolve(ev.sel,useItem.c,useItem.voicing,ev.ref==='next'?item.pinky:prevPinky,Math.min(...useItem.voicing));
+          // honor hand mutes
+          if(hand==='lh'&&!state.fluency.lh)return;
+          if(hand==='rh'&&!state.fluency.rh)return;
+          flQueue.push({type:'play',hand,midis,dur:Math.max(.1,ev.dur*beatDur),vel:ev.vel,time:flNextTime,step:s16});
+        });};
+        fire(g.LH,'lh');fire(g.RH,'rh');
+      }
+      // drums via the existing drum voices
+      if(state.fluency.drums&&g.drum&&g.drum!=='none'){
+        const pat=DRUM_PATTERNS[g.drum];
+        if(pat&&pat.rows){for(const sym in pat.rows){const chr=pat.rows[sym][s16];if(chr&&chr!=='-')playDrum(chr,flNextTime);}}
+      }
+    }
+    flNextTime+=stepDur;flStep++;
+  }
+  flTimer=setTimeout(flScheduler,25);
+}
+function flDraw(){
+  if(!flPlaying)return;
+  const ac=audio();
+  while(flQueue.length&&flQueue[0].time<=ac.currentTime+0.001){
+    const q=flQueue.shift();
+    if(q.type==='play'){
+      playMidis(q.midis,q.dur,q.time,false,q.vel);
+      flLit(q.midis,q.time,q.dur);
+      // light the matching grid cell
+      const sel=q.hand==='lh'?'.fl-cell.lh':'.fl-cell.rh';
+      const cells=$('flGrid').querySelectorAll(sel);
+      cells.forEach(c=>{if(+c.dataset.step===q.step){c.classList.add('playing');setTimeout(()=>c.classList.remove('playing'),Math.max(120,q.dur*900));}});
+    }else if(q.type==='bar'){
+      renderFlCards(q.slot);
+      [...$('flProgLine').children].forEach((el,i)=>el.classList.toggle('on',i===q.slot));
+    }else if(q.type==='end'){flStop();return;}
+  }
+  requestAnimationFrame(flDraw);
+}
+
+// wiring
+function wireFluency(){
+  const rerenderAndMaybeRestart=()=>{const was=flPlaying;if(was)flStop();renderFluency();if(was)flStart();};
+  $('flKeySel').addEventListener('change',e=>{flKeyRoot=e.target.value;rerenderAndMaybeRestart();});
+  $('flGenreSel').addEventListener('change',e=>{state.fluency.genre=e.target.value;state.fluency.progIdx=0;rerenderAndMaybeRestart();});
+  $('flProgSel').addEventListener('change',e=>{state.fluency.progIdx=+e.target.value;rerenderAndMaybeRestart();});
+  $('flGrooveSel').addEventListener('change',e=>{state.fluency.groove=e.target.value;const g=GROOVE_PATTERNS[e.target.value];if(g&&g.bpm){state.fluency.bpm=g.bpm;}renderFluency();if(flPlaying){flStop();flStart();}});
+  $('flTypeSel').addEventListener('change',e=>{/* scale is preset-driven; changing it just reflects on next progression pick */ flType=e.target.value;rerenderAndMaybeRestart();});
+  $('flBpmSel').addEventListener('change',e=>{state.fluency.bpm=+e.target.value;state.bpm=state.fluency.bpm;saveURL();});
+  $('flPlayBtn').addEventListener('click',flStart);
+  $('flLoopPill').addEventListener('click',()=>{state.fluency.loop=!state.fluency.loop;renderFlSetup();saveURL();});
+  $('flDrumChk').addEventListener('change',e=>{state.fluency.drums=e.target.checked;saveURL();});
+  $('flLHChk').addEventListener('change',e=>{state.fluency.lh=e.target.checked;saveURL();});
+  $('flRHChk').addEventListener('change',e=>{state.fluency.rh=e.target.checked;saveURL();});
+  $('flProgLine').addEventListener('click',e=>{const c=e.target.closest('.flc');if(!c)return;const i=+c.dataset.i;const it=flVoicePath[i];if(it)playMidis(it.voicing,1.4,null,true);});
+}
+
+/* =========================================================
    TAB SWITCHING
    ========================================================= */
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   const id=t.dataset.tab;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));
   document.querySelectorAll('.tabpage').forEach(p=>p.classList.toggle('active',p.id==='page-'+id));
+  if(id!=='fluency'&&flPlaying)flStop();               // leaving Fluency stops its clock
   if(id==='player'){unlock();initPiano();player.resize();player.draw();}
+  if(id==='fluency'){unlock();renderFluency();}
 }));
 
 /* =========================================================
@@ -3042,6 +3402,7 @@ function playerFeedNote(midi){if(player.wait&&player.playing){player.waitSatisfi
 loadURL();
 fillTypeSeg();fillDrumSeg();buildKeyboard();buildDots();render();renderProgLib();
 renderFreeRoots();renderFreeQuals();renderFreeChips();
+buildFlKeyboard();wireFluency();renderFluency();
 wirePlayer();
 // collapsible panels: click the heading to fold the whole section away
 document.querySelectorAll('.panel.collapsible>h2[data-collapse]').forEach(h=>{
