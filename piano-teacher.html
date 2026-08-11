@@ -499,15 +499,6 @@
     </div>
   </div>
 
-  <!-- ===== CHORD TECHNIQUE ===== -->
-  <div class="panel collapsible closed" id="techPanel">
-    <h2 data-collapse>How to Play This Chord</h2>
-    <div class="collapse-body">
-      <p class="muted" style="margin:2px 0 12px">Block is the default. Tap a technique to hear it and set how chords play back in the progression too.</p>
-      <div class="tech-grid" id="techGrid"></div>
-    </div>
-  </div>
-
   <!-- ===== FREE-FLOWING (falling keys) ===== -->
   <div class="panel collapsible" id="freeFlowPanel" style="display:none">
     <h2 data-collapse>🌊 Play It Free-Flowing (Falling Keys)</h2>
@@ -548,9 +539,19 @@
     </div>
   </div>
 
+  <!-- ===== CHORD TECHNIQUE ===== -->
+  <div class="panel collapsible closed" id="techPanel">
+    <h2 data-collapse>How to Play This Chord</h2>
+    <div class="collapse-body">
+      <p class="muted" style="margin:2px 0 12px">Block is the default. Tap a technique to hear it and set how chords play back in the progression too.</p>
+      <div class="tech-grid" id="techGrid"></div>
+    </div>
+  </div>
+
     <!-- ===== METRONOME / DRUMS ===== -->
-    <div class="panel">
-      <h2>Metronome &amp; Drum Grooves</h2>
+    <div class="panel collapsible closed">
+      <h2 data-collapse>Metronome &amp; Drum Grooves</h2>
+      <div class="collapse-body">
       <div class="metro">
         <button class="action primary" id="metroBtn" style="min-width:110px">▶ Start</button>
         <div class="bpm-display"><span id="bpmVal">100</span></div>
@@ -566,6 +567,7 @@
         <div class="seg" id="drumSeg"></div>
       </div>
       <div class="beat-dots" id="beatDots" style="margin-top:16px"></div>
+      </div>
     </div>
 
   <!-- ===== SHEET (toggle) ===== -->
@@ -578,8 +580,9 @@
   </div>
 
   <!-- ===== PRACTICE MODE ===== -->
-  <div class="panel">
-    <h2>Practice Mode</h2>
+  <div class="panel collapsible closed">
+    <h2 data-collapse>Practice Mode</h2>
+    <div class="collapse-body">
     <div class="row" style="margin-bottom:12px">
       <div class="ctl"><label>Drill</label>
         <select id="drillSel">
@@ -604,6 +607,7 @@
         <button class="action" id="pReveal">Show answer</button>
         <button class="action" id="pSkip">Skip →</button>
       </div>
+    </div>
     </div>
   </div>
 
@@ -971,13 +975,16 @@ function chooseBassRoot(pc,prevPinky,rhLo,span){
   if(!cands.length)return pcInOctave(pc,ARR_LO);
   const target=prevPinky==null?39:prevPinky;                             // D#2-ish home on the first chord
   // Priorities, in order: (1) the whole hand must clear the right hand — a hard constraint, so
-  // we drop BELOW the band when a low RH forces it (same as the old tuck rule); (2) prefer the
-  // comfortable bass band; (3) land nearest the previous bass note (path of least resistance);
-  // (4) tie → the higher octave.
+  // we drop BELOW the band when a low RH forces it (same as the old tuck rule); (2) land nearest
+  // the previous bass note — PATH OF LEAST RESISTANCE, the rule that matters most; (3) prefer the
+  // comfortable bass band only as a tiebreak (and to seed the very first chord via `target`);
+  // (4) tie → the higher octave. Path-of-least-resistance MUST beat the band, otherwise a chord
+  // that got forced low by the right hand pulls the band preference the wrong way and the next
+  // root leaps back up into the band (the "G up, Am down, F back up" zigzag).
   cands.sort((a,b)=>
     ((a+span<rhLo?0:1)-(b+span<rhLo?0:1)) ||
-    ((a>=BASS_BAND_LO&&a<=BASS_BAND_HI?0:1)-(b>=BASS_BAND_LO&&b<=BASS_BAND_HI?0:1)) ||
-    (Math.abs(a-target)-Math.abs(b-target)) || (b-a));
+    (Math.abs(a-target)-Math.abs(b-target)) ||
+    ((a>=BASS_BAND_LO&&a<=BASS_BAND_HI?0:1)-(b>=BASS_BAND_LO&&b<=BASS_BAND_HI?0:1)) || (b-a));
   return cands[0];
 }
 // Intervals of the chord above its root, e.g. major=[0,4,7], dom7=[0,4,7,10].
@@ -1131,6 +1138,12 @@ function arrange(prog,style,motion,level,bassMode,srcChords=chords,keyRootName=s
   // tonic ABOVE later degrees — the "1 chord is far right, next note drops down" bug.
   const bassFloor=pcInOctave(pcOf(keyRootName),36);
   const SPAN={root:0,octaves:12,root5:7};
+  // Smooth voicing MEMORY: the first time we voice a given chord we remember exactly where it
+  // sat; if that same chord returns later (e.g. Emaj7 → A → Emaj7) we put it back in that same
+  // spot instead of re-voice-leading it toward whatever just played. That's the "a repeat of a
+  // chord should return to its original position" rule — otherwise the second Emaj7 snaps to a
+  // random nearby inversion of the chord before it.
+  const voiceMemo={};
   const notes=[];let t=0,bar=0,prevTones=null,prevPinky=null;
   seq.forEach(({d,pi})=>{
     const c=srcChords[d];if(!c){bar++;return;}
@@ -1141,7 +1154,11 @@ function arrange(prog,style,motion,level,bassMode,srcChords=chords,keyRootName=s
     //   roaming → close-position voicing whose floor rides a slow up-and-down sweep
     //   else    → root position near C4
     let tones;
-    if(useSmooth)     tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    if(useSmooth){
+      const memoKey=c.midis.join(',');
+      if(voiceMemo[memoKey])tones=voiceMemo[memoKey].slice();          // seen before → return home
+      else{tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);voiceMemo[memoKey]=tones.slice();}
+    }
     else if(roaming)  tones=voiceNear(c,Math.round(ROAM_BASE+triWave(bar,totalBars)*reach));
     else              tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;            // voice-lead the NEXT chord toward this (pre-fit) voicing
@@ -1222,13 +1239,18 @@ function arrangePreview(prog,srcChords=chords,keyRootName=state.keyRoot){
   // Anchor the bass to the tonic so the 1 chord is lowest and degrees stack upward in key
   // order (matches the real arranger). Fixed floor wrapped low pitch classes up an octave.
   const bassFloor=pcInOctave(pcOf(keyRootName),36);
+  const voiceMemo={};   // recurring chords return to their first voicing (see arrange())
   const notes=[];let t=0,bar=0,prevTones=null,prevPinky=null;
   prog.forEach((d,pi)=>{
     const c=srcChords[d];if(!c)return;
     // RIGHT HAND FIRST — smooth voice-leads chord-to-chord; otherwise root position near C4.
     // The bass is then tucked underneath it, so the two hands never share a key.
     let tones;
-    if(useSmooth) tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);
+    if(useSmooth){
+      const memoKey=c.midis.join(',');
+      if(voiceMemo[memoKey])tones=voiceMemo[memoKey].slice();
+      else{tones=smoothVoicing(c.midis,prevTones).slice().sort((a,b)=>a-b);voiceMemo[memoKey]=tones.slice();}
+    }
     else          tones=tonesFrom(c,pcInOctave(c.rootPc,57));
     prevTones=tones;
     // ALWAYS a block chord (all tones together) — the shape of the chord, nothing more.
@@ -1585,18 +1607,18 @@ function rim(when,v=.45){const ac=audio();const o=ac.createOscillator();o.type='
 function tom(when,v=.6,f=160){const ac=audio();const o=ac.createOscillator();o.type='sine';const g=drumGain(when,v,.2);o.frequency.setValueAtTime(f,when);o.frequency.exponentialRampToValueAtTime(f*.6,when+.16);o.connect(g);o.start(when);o.stop(when+.24);}
 function ride(when,v=.24){const ac=audio();const src=ac.createBufferSource();src.buffer=noiseBuffer();const hp=ac.createBiquadFilter();hp.type='highpass';hp.frequency.value=6000;const g=drumGain(when,v,.12);const o=ac.createOscillator();o.type='square';o.frequency.value=5200;const g2=drumGain(when,v*.15,.1);src.connect(hp);hp.connect(g);o.connect(g2);src.start(when);src.stop(when+.14);o.start(when);o.stop(when+.1);}
 function playDrum(s,when){if(s==='K')kick(when);else if(s==='S')snare(when);else if(s==='h')hat(when,.22,false);else if(s==='o')hat(when,.3,true);else if(s==='r')rim(when,.45);else if(s==='R')ride(when,.24);else if(s==='t')tom(when,.55,150);else if(s==='T')tom(when,.55,110);}
+// Simple, correct rock beats. 16 steps = one bar of 4; index 0=beat 1, 4=beat 2, 8=beat 3,
+// 12=beat 4. The rule for all of them: KICK leads beat 1 (like the metronome's accented
+// downbeat), SNARE is the backbeat on 2 & 4, and the kick is NEVER four-on-the-floor (that
+// stacks kick+snare on 2 & 4 and muddies the backbeat — the old "hits on 2 not 4" feel).
 const DRUM_PATTERNS={
   none:    {name:'Click',      rows:null},
-  ballad:  {name:'Ballad',     rows:{K:'K-------K-------',S:'--------S-------',h:'h-h-h-h-h-h-h-h-'}},
-  brush:   {name:'Brushes',    rows:{K:'K---K---K---K---',S:'--r---r---r---r-',o:'o---o---o---o---'}},
-  rock:    {name:'Rock',       rows:{K:'K---K---K---K---',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}},
-  backbeat:{name:'Backbeat',   rows:{K:'K-------K-------',S:'----S-------S---',h:'h---h---h---h---'}},
-  poprock: {name:'Pop/Rock',   rows:{K:'K---K-K-K---K-K-',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}},
-  halftime:{name:'Half-time',  rows:{K:'K-------K-------',S:'--------S-------',h:'h-h-h-h-h-h-h-h-'}},
-  boombap: {name:'Boom-Bap',   rows:{K:'K-----K-K-------',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}},
-  motown:  {name:'Motown',     rows:{K:'K---K---K---K---',S:'--S---S---S---S-',h:'h-h-h-h-h-h-h-h-'}},
-  shuffle: {name:'Shuffle',    rows:{K:'K-----K-----K---',S:'----S-------S---',R:'R--R--R--R--R--R'}},
-  surf:    {name:'Surf Rock',  rows:{K:'K---K---K---K---',S:'--S-S-S---S-S-S-',h:'h-h-h-h-h-h-h-h-'}},
+  rock:    {name:'Rock',       rows:{K:'K-------K-------',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}}, // K 1,3 · S 2,4 · 8th hats
+  backbeat:{name:'Backbeat',   rows:{K:'K-------K-------',S:'----S-------S---',h:'h---h---h---h---'}}, // same, airier quarter hats
+  poprock: {name:'Pop/Rock',   rows:{K:'K-------K-K-----',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}}, // adds kick on the "and" of 3
+  boombap: {name:'Boom-Bap',   rows:{K:'K-----K---------',S:'----S-------S---',h:'h-h-h-h-h-h-h-h-'}}, // K 1 + "and" of 2 · S 2,4
+  halftime:{name:'Half-time',  rows:{K:'K---------------',S:'--------S-------',h:'h-h-h-h-h-h-h-h-'}}, // big slow feel: K 1 · S 3
+  ballad:  {name:'Ballad',     rows:{K:'K---------------',S:'--------S-------',h:'h---h---h---h---'}}, // gentle: K 1 · S 3 · quarter hats
 };
 ['pointerdown','touchstart','keydown'].forEach(ev=>window.addEventListener(ev,function once(){unlock();},{once:true,passive:true}));
 
