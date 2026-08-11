@@ -210,9 +210,15 @@
   .deg-btns button{min-width:56px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 6px;font-weight:800;cursor:pointer;text-align:center}
   .deg-btns button:hover{border-color:var(--indigo)}
   .deg-btns .rn{display:block;font-size:11px;color:var(--muted);font-weight:600}
-  .presets{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
-  .presets button,.songbtns button{font-size:12px;padding:8px 12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:20px;cursor:pointer}
-  .presets button:hover,.songbtns button:hover{border-color:var(--indigo)}
+  .prog-lib{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin:12px 0}
+  .prog-lib .ctl{flex:1 1 200px;min-width:160px}
+  .prog-lib .ctl label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+  .prog-lib select{width:100%;appearance:none;-webkit-appearance:none;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:14px;font-weight:700;cursor:pointer}
+  .prog-lib select:hover{border-color:var(--indigo)}
+  .prog-info{font-size:13px;color:var(--muted);margin:0 0 4px;min-height:18px;line-height:1.4}
+  .prog-info b{color:var(--text)}
+  .songbtns button{font-size:12px;padding:8px 12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:20px;cursor:pointer}
+  .songbtns button:hover{border-color:var(--indigo)}
   .songbtns{display:flex;gap:7px;flex-wrap:wrap}
   .prog-chips{display:flex;gap:8px;flex-wrap:wrap;min-height:56px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px}
   .prog-chip{background:linear-gradient(180deg,#5b6ee1,#4453c9);border:1px solid #4453c9;border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;cursor:pointer}
@@ -398,9 +404,14 @@
     <div class="panel collapsible" id="progPanel">
       <h2 data-collapse>Build a Progression (Number Pattern)</h2>
       <div class="collapse-body">
-        <p class="muted" style="margin:2px 0 10px">Tap numbers to stack them, grab a preset, or load a real song below.</p>
+        <p class="muted" style="margin:2px 0 10px">Pick a genre + a classic progression, tap numbers to build your own, or load a real song below.</p>
         <div class="deg-btns" id="degBtns"></div>
-        <div class="presets" id="presets"></div>
+        <div class="prog-lib" id="progLib">
+          <div class="ctl"><label>Genre</label><select id="genreSel"></select></div>
+          <div class="ctl"><label>Progression</label><select id="progSel"></select></div>
+          <button class="action" id="loadProgBtn" style="align-self:flex-end">Load ↴</button>
+        </div>
+        <div class="prog-info" id="progInfo"></div>
         <details class="subcollapse" id="songLibDetails">
           <summary>🎵 Song library</summary>
           <div class="songbtns" id="songbtns" style="margin-top:10px"></div>
@@ -1639,6 +1650,57 @@ const SONGS={
 };
 
 /* =========================================================
+   PROGRESSION LIBRARY — the most common progressions per genre.
+   Each entry is self-contained: it carries its own scale `type` and
+   `seventh` flag, so loading it sets the scale AND the degrees.
+   `degrees` index into buildChords() for that type
+   (major: 0=I 1=ii 2=iii 3=IV 4=V 5=vi 6=vii°;
+    minor: 0=i 1=ii° 2=bIII 3=iv 4=v 5=bVI 6=bVII;
+    mixo:  same shape as major but 6=bVII).
+   Some progressions legitimately live in more than one genre — that's fine.
+   ========================================================= */
+const PROGRESSION_LIBRARY={
+  'Pop':[
+    {name:'I–V–vi–IV',      pat:'1 5 6m 4',      degrees:[0,4,5,3],     type:'major',seventh:false,mood:'The “four-chord song.” Powers a huge share of modern pop.'},
+    {name:'vi–IV–I–V',      pat:'6m 4 1 5',      degrees:[5,3,0,4],     type:'major',seventh:false,mood:'Same four chords, sadder start. The “Axis” progression.'},
+    {name:'I–vi–IV–V',      pat:'1 6m 4 5',      degrees:[0,5,3,4],     type:'major',seventh:false,mood:'50s doo-wop. Sweet, nostalgic, endlessly loopable.'},
+    {name:'I–V–vi–iii–IV',  pat:'1 5 6m 3m 4',   degrees:[0,4,5,2,3],   type:'major',seventh:false,mood:'The Pachelbel/Canon descent — grand and cascading.'},
+  ],
+  'Rock':[
+    {name:'I–IV–V',         pat:'1 4 5',         degrees:[0,3,4],       type:'major',seventh:false,mood:'Three-chord rock. The bedrock of the genre.'},
+    {name:'I–♭VII–IV',      pat:'1 ♭7 4',        degrees:[0,6,3],       type:'mixo', seventh:false,mood:'Mixolydian rock — “Sweet Home Alabama,” classic-rock swagger.'},
+    {name:'I–V–IV',         pat:'1 5 4',         degrees:[0,4,3],       type:'major',seventh:false,mood:'The driving arena-rock vamp.'},
+    {name:'I–IV–vi–V',      pat:'1 4 6m 5',      degrees:[0,3,5,4],     type:'major',seventh:false,mood:'Pop-punk / power-pop energy.'},
+  ],
+  'Blues':[
+    {name:'12-Bar Blues',   pat:'1 1 1 1 4 4 1 1 5 4 1 5',degrees:[0,0,0,0,3,3,0,0,4,3,0,4],type:'major',seventh:false,mood:'The full 12-bar form. Add 7ths by ear for the bluesy color.'},
+    {name:'Quick-Change',   pat:'1 4 1 5',       degrees:[0,3,0,4],     type:'major',seventh:false,mood:'12-bar shorthand — hits the IV early.'},
+    {name:'I–IV–V Shuffle', pat:'1 4 5',         degrees:[0,3,4],       type:'major',seventh:false,mood:'The three-chord blues, straight up.'},
+  ],
+  'Jazz':[
+    {name:'ii–V–I',         pat:'2m 5 1',        degrees:[1,4,0],       type:'major',seventh:true, mood:'The single most important cadence in jazz.'},
+    {name:'I–vi–ii–V',      pat:'1 6m 2m 5',     degrees:[0,5,1,4],     type:'major',seventh:true, mood:'The turnaround — loops back to the top forever.'},
+    {name:'iii–vi–ii–V',    pat:'3m 6m 2m 5',    degrees:[2,5,1,4],     type:'major',seventh:true, mood:'Extended turnaround, a longer descent to home.'},
+  ],
+  'R&B / Soul':[
+    {name:'I–vi–IV–V',      pat:'1 6m 4 5',      degrees:[0,5,3,4],     type:'major',seventh:false,mood:'The Motown staple.'},
+    {name:'ii–V–I',         pat:'2m 5 1',        degrees:[1,4,0],       type:'major',seventh:true, mood:'Neo-soul lean on the ii–V–I with 7ths.'},
+    {name:'I–IV vamp',      pat:'1 4',           degrees:[0,3],         type:'major',seventh:false,mood:'The gospel/soul two-chord vamp.'},
+  ],
+  'Folk / Country':[
+    {name:'I–IV–V',         pat:'1 4 5',         degrees:[0,3,4],       type:'major',seventh:false,mood:'Campfire simplicity.'},
+    {name:'I–V–vi–IV',      pat:'1 5 6m 4',      degrees:[0,4,5,3],     type:'major',seventh:false,mood:'The crossover-country pop staple.'},
+    {name:'I–IV–I–V',       pat:'1 4 1 5',       degrees:[0,3,0,4],     type:'major',seventh:false,mood:'Old-time / bluegrass back-and-forth.'},
+  ],
+  'Minor / Cinematic':[
+    {name:'i–♭VI–♭VII',     pat:'1m ♭6 ♭7',      degrees:[0,5,6],       type:'minor',seventh:false,mood:'Epic, rising — the film-trailer progression.'},
+    {name:'i–iv–v',         pat:'1m 4m 5m',      degrees:[0,3,4],       type:'minor',seventh:false,mood:'Pure natural-minor melancholy.'},
+    {name:'i–♭VII–♭VI–♭VII',pat:'1m ♭7 ♭6 ♭7',  degrees:[0,6,5,6],     type:'minor',seventh:false,mood:'Andalusian-flavored, brooding loop.'},
+    {name:'i–♭III–♭VII–iv', pat:'1m ♭3 ♭7 4m',   degrees:[0,2,6,3],     type:'minor',seventh:false,mood:'Moody indie / cinematic swell.'},
+  ],
+};
+
+/* =========================================================
    STATE
    ========================================================= */
 const state={keyRoot:'C',type:'major',degree:0,seventh:false,inversion:0,technique:'block',
@@ -1887,15 +1949,45 @@ function renderTech(){
   }));
 }
 function renderDegBtns(){
-  const wrap=$('degBtns'),pre=$('presets'),sb=$('songbtns');
-  if(!chords.length){wrap.innerHTML='<span class="empty-hint">Pick a 7-note scale (major/minor) to build progressions.</span>';pre.innerHTML='';sb.innerHTML='';return;}
+  const wrap=$('degBtns'),sb=$('songbtns');
+  if(!chords.length){wrap.innerHTML='<span class="empty-hint">Pick a 7-note scale (major/minor) to build progressions.</span>';sb.innerHTML='';return;}
   wrap.innerHTML=chords.map((c,i)=>`<button data-i="${i}"><b>${c.numLabel}</b><span class="rn">${c.name}</span></button>`).join('');
   wrap.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{state.progression.push(+b.dataset.i);renderProg();saveURL();}));
-  const presets={'Pop · 1 5 6m 4':[0,4,5,3],'Doo-wop · 1 6m 4 5':[0,5,3,4],'Sensitive · 6m 4 1 5':[5,3,0,4],'Jazz · 2m 5 1':[1,4,0],'Blues · 1 4 5':[0,3,4],'Canon · 1 5 6m 3m 4':[0,4,5,2,3]};
-  pre.innerHTML=Object.keys(presets).map(k=>`<button data-p="${k}">${k}</button>`).join('');
-  pre.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{state.progression=[...presets[b.dataset.p]];renderProg();saveURL();}));
   sb.innerHTML=Object.keys(SONGS).map(k=>`<button data-s="${k}">${k}</button>`).join('');
   sb.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{state.progression=[...SONGS[b.dataset.s]];renderProg();saveURL();toast('Loaded: '+b.dataset.s);}));
+}
+// ---- Genre + Progression dropdowns (self-contained: each entry carries its own scale) ----
+let libGenre=Object.keys(PROGRESSION_LIBRARY)[0], libIdx=0;   // default genre = Pop
+function renderProgLib(){
+  const gs=$('genreSel'),ps=$('progSel');if(!gs||!ps)return;
+  if(!PROGRESSION_LIBRARY[libGenre])libGenre=Object.keys(PROGRESSION_LIBRARY)[0];
+  gs.innerHTML=Object.keys(PROGRESSION_LIBRARY).map(g=>`<option value="${g}"${g===libGenre?' selected':''}>${g}</option>`).join('');
+  const list=PROGRESSION_LIBRARY[libGenre];
+  if(libIdx>=list.length)libIdx=0;
+  ps.innerHTML=list.map((p,i)=>`<option value="${i}"${i===libIdx?' selected':''}>${p.name}  ·  ${p.pat}</option>`).join('');
+  renderProgInfo();
+}
+function renderProgInfo(){
+  const box=$('progInfo');if(!box)return;
+  const p=PROGRESSION_LIBRARY[libGenre]&&PROGRESSION_LIBRARY[libGenre][libIdx];
+  if(!p){box.innerHTML='';return;}
+  const scaleName=(SCALE_DEFS[p.type]||{}).name||p.type;
+  box.innerHTML=`<b>${p.name}</b> — ${p.mood} <span style="opacity:.7">(${scaleName}${p.seventh?' · 7ths':''})</span>`;
+}
+// Load the selected library progression: set its scale + 7th, rebuild chords, then the degrees.
+function loadLibProgression(){
+  const p=PROGRESSION_LIBRARY[libGenre]&&PROGRESSION_LIBRARY[libGenre][libIdx];
+  if(!p)return;
+  if(SCALE_DEFS[p.type])state.type=p.type;
+  state.seventh=!!p.seventh;
+  const rs=rootSetFor(state.type);
+  if(!rs.includes(state.keyRoot))state.keyRoot=nearestRoot(state.keyRoot,rs);
+  state.inversion=0;state.progViewIdx=-1;
+  scale=spellScale(state.keyRoot,state.type);
+  chords=buildChords(scale,state.seventh);
+  state.progression=p.degrees.filter(d=>d<chords.length);
+  render();
+  toast('Loaded: '+p.name+' ('+libGenre+')');
 }
 function renderProg(){
   const box=$('progChips');
@@ -2335,6 +2427,9 @@ $('handTog').querySelectorAll('button').forEach(b=>b.addEventListener('click',()
 
 $('playProgBtn').addEventListener('click',playProgression);
 $('clearProgBtn').addEventListener('click',()=>{state.progression=[];renderProg();saveURL();});
+$('genreSel').addEventListener('change',e=>{libGenre=e.target.value;libIdx=0;renderProgLib();});
+$('progSel').addEventListener('change',e=>{libIdx=+e.target.value;renderProgInfo();});
+$('loadProgBtn').addEventListener('click',loadLibProgression);
 $('bpcSel').addEventListener('change',e=>{state.beatsPerChord=+e.target.value;saveURL();});
 // ---- Free Chords wiring ----
 $('freeAddBtn').addEventListener('click',freeAdd);
@@ -2945,7 +3040,7 @@ function playerFeedNote(midi){if(player.wait&&player.playing){player.waitSatisfi
 
 /* init */
 loadURL();
-fillTypeSeg();fillDrumSeg();buildKeyboard();buildDots();render();
+fillTypeSeg();fillDrumSeg();buildKeyboard();buildDots();render();renderProgLib();
 renderFreeRoots();renderFreeQuals();renderFreeChips();
 wirePlayer();
 // collapsible panels: click the heading to fold the whole section away
