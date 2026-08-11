@@ -492,7 +492,6 @@
       <div class="pill gold" id="scalePill"><span class="ind"></span>Scale <span class="st">Off</span></div>
       <div class="pill blue on" id="chordPill"><span class="ind"></span>Chord <span class="st">On</span></div>
       <div class="pill gold" id="bassPill"><span class="ind"></span>Bass note <span class="st">Off</span></div>
-      <div class="pill blue" id="namesPill"><span class="ind"></span>Note names <span class="st">Off</span></div>
       <div class="pill blue" id="sheetPill"><span class="ind"></span>Sheet <span class="st">Off</span></div>
       <span style="margin-left:auto"></span>
       <div class="ctl" style="flex-direction:row;align-items:center;gap:6px">
@@ -2561,8 +2560,6 @@ $('seventhBtn').addEventListener('click',()=>{state.seventh=!state.seventh;state
 pill($('scalePill'),'scaleOn','On','Off',renderKeyboard);
 pill($('chordPill'),'chordOn','On','Off',renderKeyboard);
 pill($('bassPill'),'bassOn','On','Off',()=>{renderKeyboard();renderBanner();});
-// Note names — show a subtle letter on every trainer key (this keyboard only)
-pill($('namesPill'),'namesOn','On','Off',applyNoteNames);
 pill($('sheetPill'),'sheetOn','On','Off',()=>{$('sheetPanel').style.display=state.sheetOn?'block':'none';if(state.sheetOn){renderSheetScale();renderSheetChord();}});
 // keep both Loop pills (in the panel and the big play-strip) visually in sync
 function syncLoopPills(){[$('loopPill'),$('psLoopPill')].forEach(el=>{if(!el)return;el.classList.toggle('on',state.loop);el.querySelector('.st').textContent=state.loop?'On':'Off';});}
