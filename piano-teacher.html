@@ -733,7 +733,7 @@
       <!-- transport bar sits BELOW the keyboard, like a video player -->
       <div class="player-controls" style="margin-top:12px">
         <div class="transport">
-          <button id="plRestart" title="Restart">⏮</button>
+          <button id="plRewind" title="Back 5 seconds">⏪ 5s</button>
           <button id="plPlay" class="big" title="Play/Pause">▶</button>
         </div>
         <div class="seekwrap">
@@ -3170,6 +3170,17 @@ function plPlay(){
 }
 function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();releaseWakeLock();}
 function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
+// Jump the playhead to an absolute second, re-syncing every scheduling/cursor bit
+// the same way the seek slider does (so nothing gets stuck when we move backward).
+function plSeekTo(t){
+  const dur=player.duration||0;
+  t=Math.max(0,Math.min(t,dur));
+  player.posAtStart=t;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();
+  player._cursorIdx=undefined;player._sheetScroll=null;
+  if(player.playing)player.startCtxTime=audio().currentTime;
+  updateCursor(t);updatePlayerChips(t);player.draw();updateSeek();
+}
+function plRewind(){plSeekTo(playerPos()-5);}
 function clearLitAll(){for(let m=KB_LO;m<=KB_HI;m++)litOff(m);}
 
 function playerLoop(){
@@ -3378,7 +3389,7 @@ function updateSeek(){$('plSeek').value=Math.round(playerPos()/player.duration*1
 function wirePlayer(){
   setupPlayerIO();
   $('plPlay').addEventListener('click',plPlayPause);
-  $('plRestart').addEventListener('click',plRestart);
+  $('plRewind').addEventListener('click',plRewind);
   $('plSeek').addEventListener('input',e=>{player.posAtStart=(+e.target.value/1000)*player.duration;player.scheduled=0;player.metroScheduled=0;if(player.playing){player.startCtxTime=audio().currentTime;}player._cursorIdx=undefined;player._sheetScroll=null;updateCursor(player.posAtStart);player.draw();updatePlayerChips(player.posAtStart);$('plTime').textContent=fmtTime(player.posAtStart);});
   $('plTempo').addEventListener('input',e=>{const v=+e.target.value;$('plTempoVal').textContent=v+'%';const wasPos=playerPos();player.rate=v/100;player.posAtStart=wasPos;if(player.playing)player.startCtxTime=audio().currentTime;});
   $('plSound').addEventListener('change',e=>{player.sound=e.target.checked;player.scheduled=player.notes.findIndex(n=>n.start>=playerPos());if(player.scheduled<0)player.scheduled=player.notes.length;});
