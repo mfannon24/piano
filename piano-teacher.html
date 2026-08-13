@@ -3067,6 +3067,12 @@ function extractFromOSMD(osmd){
   // seconds per whole note = 4 beats * (60/bpm)
   const secPerWhole=(4*60)/bpmDefault;
   const cursor=osmd.cursor;cursor.reset();
+  // A TIE joins same-pitch notes into one sustained sound: strike once, hold through the
+  // rest. OSMD gives every note in the tie the SAME Tie object, so we emit only the first
+  // and extend its end as the continuation notes go by — instead of re-striking each one.
+  // (A slur, by contrast, connects DIFFERENT pitches and DOES re-strike, so it never sets
+  // NoteTie and flows through untouched.)
+  const tieMap=new Map();
   let idx=0;
   let guard=0;
   while(!cursor.Iterator.EndReached && guard<100000){
@@ -3085,7 +3091,19 @@ function extractFromOSMD(osmd){
         if(!n.Pitch)return;
         const midi=n.Pitch.getHalfTone()+12; // OSMD halftone C0=0 → MIDI +12
         const durWhole=(n.Length&&n.Length.RealValue)||0;
-        notes.push({midi,start:t,end:t+durWhole*secPerWhole,hand:isLH?'L':'R',name:spellPitch(n.Pitch,midi)});
+        const end=t+durWhole*secPerWhole;
+        const tie=n.NoteTie||n.Tie||null;
+        if(tie){
+          const held=tieMap.get(tie);
+          if(held){ // continuation of a note already struck: just sustain it, don't re-play
+            if(end>held.end)held.end=end;
+            return;
+          }
+          const ev={midi,start:t,end,hand:isLH?'L':'R',name:spellPitch(n.Pitch,midi)};
+          notes.push(ev);tieMap.set(tie,ev); // first note of the tie: strike + remember to extend
+          return;
+        }
+        notes.push({midi,start:t,end,hand:isLH?'L':'R',name:spellPitch(n.Pitch,midi)});
       });
     });
     idx++;
