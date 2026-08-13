@@ -3174,17 +3174,43 @@ async function acquireWakeLock(){
     _wakeLock.addEventListener('release',()=>{_wakeLock=null;}); } }catch(e){/* denied or unsupported */}
 }
 function releaseWakeLock(){ try{ if(_wakeLock){_wakeLock.release();_wakeLock=null;} }catch(e){} }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&(player.playing||(typeof progPlaying!=='undefined'&&progPlaying)))acquireWakeLock(); });
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  // Coming back from sleep/tab-switch: nudge the (possibly suspended) audio context back to
+  // life. This alone can't fully un-suspend iOS audio without a gesture, but it clears the
+  // common desktop/tab-switch case; the tap-to-play path (plPlay) does the gesture-gated
+  // resume that iOS requires. Also re-grab the screen wake lock if we were mid-playback.
+  try{ if(AC&&AC.state==='suspended')AC.resume().catch(()=>{}); }catch(e){}
+  if(player.playing||(typeof progPlaying!=='undefined'&&progPlaying))acquireWakeLock();
+});
 
 function plPlayPause(){player.playing?plPause():plPlay();}
 function plPlay(){
-  if(!player.notes.length)return;unlock();const ac=audio();
-  if(playerPos()>=player.duration-0.05)player.posAtStart=0;
-  player.startCtxTime=ac.currentTime;player.playing=true;
-  player.scheduled=0;player.metroScheduled=0; // reschedule audio + clicks from current pos
-  $('plPlay').textContent='⏸';$('plPlay').classList.add('on');
-  acquireWakeLock();                          // hold the screen on while playing/looping
-  cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
+  if(!player.notes.length||player._starting)return;
+  const ac=audio();
+  // Everything that actually starts the clock, run only AFTER audio is truly running.
+  const begin=()=>{
+    player._starting=false;
+    if(playerPos()>=player.duration-0.05)player.posAtStart=0;
+    player.startCtxTime=ac.currentTime;player.playing=true;
+    player.scheduled=0;player.metroScheduled=0; // reschedule audio + clicks from current pos
+    $('plPlay').textContent='⏸';$('plPlay').classList.add('on');
+    acquireWakeLock();                          // hold the screen on while playing/looping
+    cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
+  };
+  // iOS suspends (or "interrupts") the AudioContext when the iPad sleeps. resume() is async
+  // and only works from a user gesture, and until it finishes ac.currentTime is FROZEN — so
+  // capturing the clock before it resumes leaves playback dead-on-arrival (the old sleep bug,
+  // which needed a full page refresh). Kick resume() off from this tap, then start once it's
+  // actually running. If it can't resume, begin() anyway so we never wedge the button.
+  const needTone=window.Tone&&Tone.context&&Tone.context.state!=='running';
+  if(ac.state!=='running'||needTone){
+    player._starting=true;
+    const ps=[];
+    if(ac.state!=='running')ps.push(ac.resume().catch(()=>{}));
+    if(needTone)ps.push(Tone.start().catch(()=>{}));
+    Promise.all(ps).then(begin,begin);
+  }else begin();
 }
 function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();releaseWakeLock();}
 function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
