@@ -1547,7 +1547,7 @@ const piano={sampler:null,ready:false,loading:false,pedal:false,ac:null,fx:null}
 // synPart = harmonic richness 0..1 (fewer/softer partials = mellower), synHammer =
 // key-strike click level 0..1 (more = brighter/percussive attack).
 const TONE_PRESETS={
-  warm:   {label:'Warm (studio)',  low:2,   mid:-1.5, high:-4,  midHz:3200, lp:11000, wet:0.28, decay:2.6, release:1.4, vol:-7,   synLp:5200, synHi:-3, synWet:0.22, synPart:0.75, synHammer:0.5,  desc:'Balanced, current default'},
+  warm:   {label:'Warm grand',     low:3.5, mid:-2,   high:-1.5,midHz:3000, lp:12500, wet:0.36, decay:3.4, release:1.7, vol:-6.5, synLp:6000, synHi:-2, synWet:0.30, synPart:0.8,  synHammer:0.45, desc:'Warm + full, open highs, roomy grand'},
   mellow: {label:'Mellow',         low:3,   mid:-2.5, high:-7,  midHz:2600, lp:7500,  wet:0.30, decay:2.8, release:1.6, vol:-7,   synLp:3400, synHi:-7, synWet:0.26, synPart:0.5,  synHammer:0.3,  desc:'Darker, upper-mids pulled back — kills whine'},
   felt:   {label:'Felt / soft',    low:3.5, mid:-3,   high:-11, midHz:2200, lp:5200,  wet:0.34, decay:3.2, release:2.0, vol:-6,   synLp:2200, synHi:-12,synWet:0.32, synPart:0.32, synHammer:0.12, desc:'Very soft, muted felt-piano — most intimate'},
   concert:{label:'Concert hall',   low:2.5, mid:-1,   high:-3,  midHz:3400, lp:12000, wet:0.45, decay:4.2, release:1.8, vol:-8,   synLp:6500, synHi:-2, synWet:0.5,  synPart:0.8,  synHammer:0.45, desc:'Roomy + lush, more reverb tail'},
@@ -1572,10 +1572,21 @@ function initPiano(){
   if(piano.loading||piano.ready||!window.Tone)return;
   piano.loading=true;
   try{
-    const base="https://tonejs.github.io/audio/salamander/";
+    // tonejs-instruments grand — nearly-chromatic samples (fuller highs than Salamander,
+    // which only sampled every 3rd note and pitch-shifted the top into a thin/"MIDI" tone).
+    // Pinned to a commit so the CDN can't shift under us. CC-BY 3.0 (nbrosowsky/tonejs-instruments).
+    const base="https://cdn.jsdelivr.net/gh/nbrosowsky/tonejs-instruments@622c2f1c32c8cfce4158ddc3eb26e518ddef37e5/samples/piano/";
     const urls={};
-    // Salamander provides these pitches; Sampler pitch-shifts to fill the rest.
-    ['A0','C1','Ds1','Fs1','A1','C2','Ds2','Fs2','A2','C3','Ds3','Fs3','A3','C4','Ds4','Fs4','A4','C5','Ds5','Fs5','A5','C6','Ds6','Fs6','A6','C7','Ds7','Fs7','A7','C8'].forEach(n=>{urls[n]=n+'.mp3';});
+    // Whole-tone spacing (every 2 semitones): max 1-semitone pitch-shift anywhere on the keyboard.
+    // Set starts at C1; A0/B0 shift down from C1 (rare, and low notes shift cleanly).
+    // Tone.Sampler needs the KEY in sharp notation (C#/F#); the FILE uses "s" (Fs4.mp3).
+    ['C1','D1','E1','F#1','G#1','A#1',
+     'C2','D2','E2','F#2','G#2','A#2',
+     'C3','D3','E3','F#3','G#3','A#3',
+     'C4','D4','E4','F#4','G#4','A#4',
+     'C5','D5','E5','F#5','G#5','A#5',
+     'C6','D6','E6','F#6','G#6','A#6',
+     'C7','D7','E7','F#7','G#7','A#7','C8'].forEach(k=>{urls[k]=k.replace('#','s')+'.mp3';});
     const p=TONE_PRESETS[currentTone]||TONE_PRESETS.mellow;
     // ---- effects chain: what turns dry samples into a warm, roomy grand ----
     // EQ: shave the harsh/whiney upper-mids and add a little low-end body.
@@ -3212,7 +3223,16 @@ function plPlay(){
     Promise.all(ps).then(begin,begin);
   }else begin();
 }
-function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();releaseWakeLock();}
+// Silence everything currently ringing. Web Audio notes play out their full scheduled
+// duration once triggered — and the auto-pedal stretches player notes to ring for up to 8s —
+// so pausing without this leaves a long tail sounding. releaseAll() lets the sampler notes
+// off through their (short) release envelope instead of ringing to their scheduled end.
+function stopAllAudio(){
+  try{ if(piano.sampler&&piano.ready)piano.sampler.releaseAll(); }catch(e){}
+  // Rebuild the synth reverb bus so any convolution tail is cut too (cheap; recreated on next note).
+  try{ if(synBus){ synBus.wet&&synBus.wet.disconnect(); synBus.dry&&synBus.dry.disconnect&&synBus.dry.disconnect(); synBus=null; } }catch(e){}
+}
+function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();stopAllAudio();releaseWakeLock();}
 function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
 // Jump the playhead to an absolute second, re-syncing every scheduling/cursor bit
 // the same way the seek slider does (so nothing gets stuck when we move backward).
@@ -3222,6 +3242,7 @@ function plSeekTo(t){
   player.posAtStart=t;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();
   player._cursorIdx=undefined;player._sheetScroll=null;
   if(player.playing)player.startCtxTime=audio().currentTime;
+  stopAllAudio();   // don't let notes from the old position ring across the jump
   updateCursor(t);updatePlayerChips(t);player.draw();updateSeek();
 }
 function plRewind(){plSeekTo(playerPos()-5);}
