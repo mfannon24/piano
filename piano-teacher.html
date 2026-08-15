@@ -1526,7 +1526,12 @@ function refreshSynthBus(){
   b.wet.gain.cancelScheduledValues(t);b.wet.gain.value=p.synWet;
   b.part=p.synPart;b.hammer=p.synHammer;
 }
-function unlock(){const ac=audio();if(ac.state==='suspended')ac.resume();if(window.Tone&&Tone.context&&Tone.context.state!=='running'){Tone.start().catch(()=>{});}}
+// iOS treats Web Audio as an "ambient" session by default: it obeys the mute switch and
+// won't drive the built-in speaker (Bluetooth still works, which is why the piano was audible
+// but the iPad speaker was silent). Declaring a 'playback' session routes to the speaker and
+// ignores the silent switch. Safari 16.4+; harmless/no-op elsewhere.
+function setPlaybackSession(){try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback';}catch(e){}}
+function unlock(){setPlaybackSession();const ac=audio();if(ac.state==='suspended')ac.resume();if(window.Tone&&Tone.context&&Tone.context.state!=='running'){Tone.start().catch(()=>{});}}
 
 /* ---------------------------------------------------------
    REAL GRAND PIANO — Salamander samples via Tone.Sampler.
@@ -3199,6 +3204,7 @@ function plPlayPause(){player.playing?plPause():plPlay();}
 function plPlay(){
   if(!player.notes.length||player._starting)return;
   const ac=audio();
+  setPlaybackSession();                         // make sure iOS routes to the speaker
   // Everything that actually starts the clock, run only AFTER audio is truly running.
   const begin=()=>{
     player._starting=false;
@@ -3220,7 +3226,14 @@ function plPlay(){
     const ps=[];
     if(ac.state!=='running')ps.push(ac.resume().catch(()=>{}));
     if(needTone)ps.push(Tone.start().catch(()=>{}));
-    Promise.all(ps).then(begin,begin);
+    // Watchdog: after sleep iOS can leave the context 'interrupted' and these promises may
+    // NEVER settle — which would pin _starting=true forever, so Play does nothing (you can
+    // still seek) until a full page refresh. Force-start after a short wait so the button can
+    // never wedge; a one-shot guard keeps the promise path and the timer from double-firing.
+    let fired=false;
+    const go=()=>{if(fired)return;fired=true;begin();};
+    Promise.all(ps).then(go,go);
+    setTimeout(go,500);
   }else begin();
 }
 // Silence everything currently ringing. Web Audio notes play out their full scheduled
