@@ -3407,6 +3407,23 @@ player.draw=function(){
     const col=noteFill(ctx,n.hand,k.black,ry,ry+rh);
     roundRect(ctx,rx,ry,rw,rh,4);ctx.fillStyle=col.grad;ctx.fill();
     ctx.strokeStyle=col.border;ctx.lineWidth=1;ctx.stroke();
+    // note-name label on the falling block itself (like HDpiano): name at the leading
+    // edge, and again at the top of tall blocks. Only when there's room to read it.
+    if(player.showNames&&rw>=8){
+      const label=noteLabelShort(n);
+      // dark text on the lighter white-key fills, soft off-white on the darker black-key fills
+      // (muted so the label doesn't jump off the screen).
+      ctx.fillStyle=k.black?'#c9d2e0':'#0e2436';
+      // narrower blocks (black keys) get a slightly smaller font; label may overflow a hair, like HDpiano.
+      ctx.font='bold '+(rw<16?11:12)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='alphabetic';
+      const cx=rx+rw/2;
+      // Label sits ON the block. Tall blocks: near the bottom (leading) edge. Short/fast
+      // blocks: centered on the block so it still reads as belonging to that note (may
+      // overflow a hair, like HDpiano) rather than being skipped.
+      let yLead=rh>=18?(ry+rh-6):(ry+rh/2+4);
+      yLead=Math.min(yLead,fallH-6);     // keep it above the keyboard hit line
+      if(yLead>10)drawNoteLabelTight(ctx,label,cx,yLead);
+    }
   };
   player.notes.forEach(n=>drawNote(n,0));
   // On a seamless loop, also render the NEXT iteration (offset by one loop length)
@@ -3415,6 +3432,27 @@ player.draw=function(){
   // keyboard, then the note-name readout lane below it
   drawMiniKeys(ctx,layout,ww,bw,fallH,kbH,pos,labelH,W);
 };
+// Short note label for a falling block: the note's own spelling minus the octave
+// (e.g. "E♭4" → "E♭"); falls back to sharp chroma when a note carries no name (MIDI).
+function noteLabelShort(n){
+  // strip the trailing octave (incl. negative like "C-1") off the spelled name; keep letter+accidental
+  if(n&&n.name){const s=n.name.replace(/-?\d+$/,'');if(s)return s;}
+  return CHROMA_SHARP[((n.midi%12)+12)%12];
+}
+// Draw a note label centered at cx with the accidental pulled in tight against the letter
+// (canvas fillText leaves a wide gap before ♭/♯). Falls back to a plain centered draw if no accidental.
+function drawNoteLabelTight(ctx,label,cx,y){
+  const m=label.match(/^([A-G])(.*)$/);
+  if(!m||!m[2]){ctx.textAlign='center';ctx.fillText(label,cx,y);return;}
+  const letter=m[1],acc=m[2];
+  const prev=ctx.textAlign;ctx.textAlign='left';
+  const lw=ctx.measureText(letter).width, aw=ctx.measureText(acc).width;
+  const gap=-1; // pull the accidental in by ~1px
+  const total=lw+gap+aw, x=cx-total/2;
+  ctx.fillText(letter,x,y);
+  ctx.fillText(acc,x+lw+gap,y);
+  ctx.textAlign=prev;
+}
 function roundRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 function drawMiniKeys(ctx,layout,ww,bw,y0,kbH,pos,labelH,W){
   // which midis are active now — keep the note so we can label with its real spelling
@@ -3443,7 +3481,7 @@ function drawMiniKeys(ctx,layout,ww,bw,y0,kbH,pos,labelH,W){
       roundRect(ctx,bx,ly,bw2,lh,6);ctx.fill();
       ctx.strokeStyle=an.hand==='R'?'#0284c7':'#7c5cd6';ctx.lineWidth=1.5;ctx.stroke();
       ctx.fillStyle='#12151f';ctx.font='bold 13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(CHROMA_SHARP[((+m%12)+12)%12],cx,ly+lh/2+0.5);
+      drawNoteLabelTight(ctx,noteLabelShort(an),cx,ly+lh/2+0.5); // same spelling as the falling block (flats match flats)
     }
     ctx.textBaseline='alphabetic';
   }
