@@ -735,6 +735,7 @@
         <div class="transport">
           <button id="plRewind" title="Back 5 seconds">⏪ 5s</button>
           <button id="plPlay" class="big" title="Play/Pause">▶</button>
+          <button id="plForward" title="Forward 5 seconds">5s ⏩</button>
         </div>
         <div class="seekwrap">
           <input type="range" id="plSeek" min="0" max="1000" value="0" step="1">
@@ -2888,7 +2889,7 @@ const player={
   duration:0,      // seconds at 100%
   title:'',
   playing:false,
-  startCtxTime:0,  // audio ctx time when playback (re)started
+  startClock:0,    // monotonic wall-clock time (nowClock) when playback (re)started
   posAtStart:0,    // song seconds at that moment
   rate:1,          // tempo multiplier
   loop:false,
@@ -3160,7 +3161,7 @@ function renderPlayerChips(){
   box.querySelectorAll('.pl-chip').forEach(ch=>ch.addEventListener('click',()=>{
     const c=player.chordStrip[+ch.dataset.idx];if(!c)return;
     player.posAtStart=c.start;player.scheduled=0;player.metroScheduled=0;player._cursorIdx=undefined;player._sheetScroll=null;
-    if(player.playing){player.startCtxTime=audio().currentTime;}
+    if(player.playing){player.startClock=nowClock();}
     updateCursor(c.start);player.draw();updateSeek();updatePlayerChips(c.start);
   }));
   player._chipIdx=-1;updatePlayerChips(playerPos());
@@ -3176,9 +3177,16 @@ function updatePlayerChips(pos){
 }
 
 /* ---- playback clock ---- */
+// Monotonic wall clock (seconds). Deliberately NOT the AudioContext clock: iOS leaves the
+// context 'interrupted' after the iPad sleeps, which FREEZES ac.currentTime. Driving the
+// transport off a frozen clock is what made playback dead-on-arrival after sleep (position
+// never advanced, nothing scheduled) while seeking still appeared to work. performance.now()
+// always advances. Audio is still SCHEDULED on the audio clock, relative to "now" each frame,
+// so there's no accumulating A/V drift.
+function nowClock(){return performance.now()/1000;}
 function playerPos(){ // current song seconds
   if(!player.playing)return player.posAtStart;
-  const ac=audio();return player.posAtStart+(ac.currentTime-player.startCtxTime)*player.rate;
+  return player.posAtStart+(nowClock()-player.startClock)*player.rate;
 }
 // ---- Keep the iPad/laptop screen awake while the waterfall is playing or looping. The
 // Screen Wake Lock API holds the screen on; it's released automatically if the tab is hidden,
@@ -3209,9 +3217,10 @@ function plPlay(){
   const begin=()=>{
     player._starting=false;
     if(playerPos()>=player.duration-0.05)player.posAtStart=0;
-    player.startCtxTime=ac.currentTime;player.playing=true;
+    player.startClock=nowClock();player.playing=true;
     player.scheduled=0;player.metroScheduled=0; // reschedule audio + clicks from current pos
     $('plPlay').textContent='⏸';$('plPlay').classList.add('on');
+    resumeSounding(player.posAtStart);          // re-voice notes we cut mid-ring on pause
     acquireWakeLock();                          // hold the screen on while playing/looping
     cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
   };
@@ -3238,15 +3247,41 @@ function plPlay(){
 }
 // Silence everything currently ringing. Web Audio notes play out their full scheduled
 // duration once triggered — and the auto-pedal stretches player notes to ring for up to 8s —
-// so pausing without this leaves a long tail sounding. releaseAll() lets the sampler notes
-// off through their (short) release envelope instead of ringing to their scheduled end.
-function stopAllAudio(){
+// so pausing without this leaves a long tail sounding.
+//   hard=true → an immediate CUT (pause). releaseAll() alone still fades each note through
+//   the sampler's release envelope (~1.5s on the warm preset) and leaves the reverb tail
+//   ringing, which is the "lingers for a second or two" problem. So we also duck the output
+//   to zero, then restore the gain a beat later once everything has been torn down.
+function stopAllAudio(hard){
   try{ if(piano.sampler&&piano.ready)piano.sampler.releaseAll(); }catch(e){}
   // Rebuild the synth reverb bus so any convolution tail is cut too (cheap; recreated on next note).
   try{ if(synBus){ synBus.wet&&synBus.wet.disconnect(); synBus.dry&&synBus.dry.disconnect&&synBus.dry.disconnect(); synBus=null; } }catch(e){}
+  if(!hard)return;
+  // Hard cut: duck both output paths to silence immediately, then restore so the next
+  // play/seek is at full level. A tiny ramp (5ms) instead of a step avoids a click.
+  try{ if(master){const t=AC.currentTime;master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0.0001,t+0.005);
+    master.gain.setValueAtTime(0.9,t+0.06);} }catch(e){}
+  try{ if(window.Tone&&Tone.Destination){const T=Tone.now();const v=Tone.Destination.volume;
+    v.cancelScheduledValues(T);v.setValueAtTime(-60,T+0.005);v.setValueAtTime(0,T+0.06);} }catch(e){}
 }
-function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();stopAllAudio();releaseWakeLock();}
-function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){const ac=audio();player.startCtxTime=ac.currentTime;}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
+function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();stopAllAudio(true);releaseWakeLock();}
+// Pause hard-cuts the audio, so any note that was mid-ring is gone. On resume, re-strike
+// those notes for just their REMAINING length so playback picks up exactly where it left off
+// instead of dropping the held harmony until the next onset. scheduleAudio() only fires notes
+// whose start is at/after pos, so without this a note struck before the pause never sounds.
+function resumeSounding(pos){
+  if(!player.sound)return;
+  const ac=audio();if(ac.state!=='running')return;
+  player.notes.forEach(n=>{
+    if(!handOn(n))return;
+    if(!(n.start<pos-0.02 && n.end>pos+0.05))return;  // only notes straddling the resume point
+    const remain=Math.max(0.12,Math.min((n.end-pos)/player.rate,8));
+    const vel=(n.hand==='L'?0.78:0.72)*0.85;          // slightly softer: it's a continuation, not a new strike
+    if(!pianoNote(n.midi,ac.currentTime,remain,vel,true))voice(midiToFreq(n.midi),ac.currentTime,Math.min(remain,4),0.26);
+  });
+}
+function plRestart(){player.posAtStart=0;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();player._cursorIdx=undefined;player._sheetScroll=null;if(player.osmd)player.osmd.cursor.reset();if(player.playing){player.startClock=nowClock();}updateCursor(0);updatePlayerChips(0);player.draw();updateSeek();}
 // Jump the playhead to an absolute second, re-syncing every scheduling/cursor bit
 // the same way the seek slider does (so nothing gets stuck when we move backward).
 function plSeekTo(t){
@@ -3254,11 +3289,15 @@ function plSeekTo(t){
   t=Math.max(0,Math.min(t,dur));
   player.posAtStart=t;player.scheduled=0;player.metroScheduled=0;player.waitSatisfied=new Set();
   player._cursorIdx=undefined;player._sheetScroll=null;
-  if(player.playing)player.startCtxTime=audio().currentTime;
-  stopAllAudio();   // don't let notes from the old position ring across the jump
+  if(player.playing)player.startClock=nowClock();
+  stopAllAudio(true);   // hard-cut: don't let notes from the old position ring across the jump
+  // Landing mid-note (common when skipping ±5s) should sound the held harmony, not silence
+  // until the next onset — the same continuation logic resume uses.
+  if(player.playing)setTimeout(()=>{if(player.playing)resumeSounding(playerPos());},70);
   updateCursor(t);updatePlayerChips(t);player.draw();updateSeek();
 }
 function plRewind(){plSeekTo(playerPos()-5);}
+function plForward(){plSeekTo(playerPos()+5);}
 function clearLitAll(){for(let m=KB_LO;m<=KB_HI;m++)litOff(m);}
 
 function playerLoop(){
@@ -3269,7 +3308,7 @@ function playerLoop(){
     const gate=nextGateTime(pos);
     if(gate!==null && pos>=gate && !gateSatisfied(gate)){
       // clamp: hold time exactly at the gate
-      player.posAtStart=gate;player.startCtxTime=audio().currentTime;pos=gate;
+      player.posAtStart=gate;player.startClock=nowClock();pos=gate;
       updateLitKeys(pos);updateCursor(pos);player.draw();updateSeek();
       player.raf=requestAnimationFrame(playerLoop);return;
     }
@@ -3329,6 +3368,12 @@ function nextPedalLift(start){
 }
 function scheduleAudio(pos){
   if(!player.sound)return;const ac=audio();const look=pos+0.2; // schedule 200ms ahead
+  // If iOS left the context suspended/interrupted (post-sleep), don't burn through notes —
+  // they'd be marked scheduled and never sound. Try to revive it and skip this frame; the
+  // visual waterfall keeps running off the wall clock either way.
+  if(ac.state!=='running'){ if(!player._reviving){player._reviving=true;
+      Promise.resolve(ac.resume()).catch(()=>{}).then(()=>{player._reviving=false;},()=>{player._reviving=false;}); }
+    return; }
   for(let i=player.scheduled;i<player.notes.length;i++){
     const n=player.notes[i];
     if(n.start<pos-0.05){player.scheduled=i+1;continue;}
@@ -3506,8 +3551,9 @@ function wirePlayer(){
   setupPlayerIO();
   $('plPlay').addEventListener('click',plPlayPause);
   $('plRewind').addEventListener('click',plRewind);
-  $('plSeek').addEventListener('input',e=>{player.posAtStart=(+e.target.value/1000)*player.duration;player.scheduled=0;player.metroScheduled=0;if(player.playing){player.startCtxTime=audio().currentTime;}player._cursorIdx=undefined;player._sheetScroll=null;updateCursor(player.posAtStart);player.draw();updatePlayerChips(player.posAtStart);$('plTime').textContent=fmtTime(player.posAtStart);});
-  $('plTempo').addEventListener('input',e=>{const v=+e.target.value;$('plTempoVal').textContent=v+'%';const wasPos=playerPos();player.rate=v/100;player.posAtStart=wasPos;if(player.playing)player.startCtxTime=audio().currentTime;});
+  $('plForward').addEventListener('click',plForward);
+  $('plSeek').addEventListener('input',e=>{player.posAtStart=(+e.target.value/1000)*player.duration;player.scheduled=0;player.metroScheduled=0;if(player.playing){player.startClock=nowClock();}player._cursorIdx=undefined;player._sheetScroll=null;updateCursor(player.posAtStart);player.draw();updatePlayerChips(player.posAtStart);$('plTime').textContent=fmtTime(player.posAtStart);});
+  $('plTempo').addEventListener('input',e=>{const v=+e.target.value;$('plTempoVal').textContent=v+'%';const wasPos=playerPos();player.rate=v/100;player.posAtStart=wasPos;if(player.playing)player.startClock=nowClock();});
   $('plSound').addEventListener('change',e=>{player.sound=e.target.checked;player.scheduled=player.notes.findIndex(n=>n.start>=playerPos());if(player.scheduled<0)player.scheduled=player.notes.length;});
   $('plRH').addEventListener('change',e=>{player.showRH=e.target.checked;player.draw();});
   $('plLH').addEventListener('change',e=>{player.showLH=e.target.checked;player.draw();});
