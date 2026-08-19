@@ -1482,7 +1482,40 @@ function noteFill(ctx,hand,isBlack,yTop,yBot){
    AUDIO
    ========================================================= */
 let AC=null,master=null;
-function audio(){if(AC)return AC;AC=new(window.AudioContext||window.webkitAudioContext)();const comp=AC.createDynamicsCompressor();master=AC.createGain();master.gain.value=.9;master.connect(comp);comp.connect(AC.destination);return AC;}
+function buildAudioGraph(){
+  AC=new(window.AudioContext||window.webkitAudioContext)();
+  const comp=AC.createDynamicsCompressor();master=AC.createGain();master.gain.value=.9;
+  master.connect(comp);comp.connect(AC.destination);
+  // Tone shares OUR context so there's only ONE thing that can die on sleep (and only one
+  // thing to revive). Without this, the sampler lived on Tone's private context and the synth
+  // on ours — either could be dead independently, which made the sleep bug hard to kill.
+  try{ if(window.Tone&&Tone.setContext)Tone.setContext(AC); }catch(e){}
+  return AC;
+}
+function audio(){if(AC)return AC;return buildAudioGraph();}
+// An iOS AudioContext can end up permanently wedged after the iPad sleeps: state stays
+// 'interrupted'/'suspended' and resume() never succeeds, so there is NOTHING to un-stick —
+// which is why the app needed a full reload. The only reliable cure is to throw the dead
+// context away and build a fresh one, then reload the sampler onto it.
+function audioIsDead(){ return !AC || AC.state==='closed' || AC.state==='interrupted'; }
+let _rebuilding=false;
+function rebuildAudio(){
+  if(_rebuilding)return Promise.resolve();
+  _rebuilding=true;
+  const old=AC;
+  try{ if(old&&old.state!=='closed')old.close(); }catch(e){}
+  synBus=null;                       // synth bus belonged to the dead context
+  piano.sampler=null;piano.ready=false;piano.loading=false;piano.fx=null; // so initPiano() rebuilds
+  AC=null;master=null;
+  const ac=buildAudioGraph();
+  setPlaybackSession();
+  // Kick a resume but DON'T await it: on a fresh context outside a user gesture the promise
+  // can hang forever, and awaiting it would pin _rebuilding=true and block every later retry.
+  try{ Promise.resolve(ac.resume()).catch(()=>{}); }catch(e){}
+  try{ if(window.Tone)initPiano(); }catch(e){}     // reload samples onto the new context
+  _rebuilding=false;
+  return Promise.resolve(ac);
+}
 
 // ---- Synth fallback tone bus ----
 // The Salamander sampler often can't load on iPad/offline, so voice() is what you
@@ -3204,7 +3237,10 @@ document.addEventListener('visibilitychange',()=>{
   // life. This alone can't fully un-suspend iOS audio without a gesture, but it clears the
   // common desktop/tab-switch case; the tap-to-play path (plPlay) does the gesture-gated
   // resume that iOS requires. Also re-grab the screen wake lock if we were mid-playback.
-  try{ if(AC&&AC.state==='suspended')AC.resume().catch(()=>{}); }catch(e){}
+  try{
+    if(audioIsDead())rebuildAudio();                      // wedged by sleep → fresh context
+    else if(AC&&AC.state==='suspended')AC.resume().catch(()=>{});
+  }catch(e){}
   if(player.playing||(typeof progPlaying!=='undefined'&&progPlaying))acquireWakeLock();
 });
 
@@ -3233,7 +3269,10 @@ function plPlay(){
   if(ac.state!=='running'||needTone){
     player._starting=true;
     const ps=[];
-    if(ac.state!=='running')ps.push(ac.resume().catch(()=>{}));
+    // A context wedged 'interrupted' by sleep will never resume — rebuild it from scratch
+    // (this is the tap that fixes the "falling keys but no sound" state without a reload).
+    if(audioIsDead())ps.push(rebuildAudio());
+    else if(ac.state!=='running')ps.push(ac.resume().catch(()=>{}));
     if(needTone)ps.push(Tone.start().catch(()=>{}));
     // Watchdog: after sleep iOS can leave the context 'interrupted' and these promises may
     // NEVER settle — which would pin _starting=true forever, so Play does nothing (you can
@@ -3369,11 +3408,29 @@ function nextPedalLift(start){
 function scheduleAudio(pos){
   if(!player.sound)return;const ac=audio();const look=pos+0.2; // schedule 200ms ahead
   // If iOS left the context suspended/interrupted (post-sleep), don't burn through notes —
-  // they'd be marked scheduled and never sound. Try to revive it and skip this frame; the
-  // visual waterfall keeps running off the wall clock either way.
-  if(ac.state!=='running'){ if(!player._reviving){player._reviving=true;
-      Promise.resolve(ac.resume()).catch(()=>{}).then(()=>{player._reviving=false;},()=>{player._reviving=false;}); }
+  // they'd be marked scheduled and never sound. Revive it and skip this frame; the visual
+  // waterfall keeps running off the wall clock either way. A context stuck 'interrupted' can
+  // never be resumed, so that case gets a full rebuild instead of a doomed resume() retry —
+  // otherwise you get exactly this bug: keys fall, no sound, only a reload fixes it.
+  if(ac.state!=='running'){
+    if(!player._reviving){player._reviving=true;
+      const done=()=>{player._reviving=false;};
+      if(audioIsDead())rebuildAudio().then(done,done);
+      else Promise.resolve(ac.resume()).catch(()=>{}).then(done,done);
+    }
     return; }
+  // Nastiest iOS case: state SAYS 'running' but the clock is actually frozen, so every note
+  // gets scheduled at a time that never arrives (silence, with the waterfall still moving).
+  // Watch currentTime across frames; if it hasn't moved while we're playing, rebuild.
+  if(player._lastCtxTime===ac.currentTime){
+    player._stallFrames=(player._stallFrames||0)+1;
+    if(player._stallFrames>30&&!player._reviving){   // ~0.5s of frames with a dead clock
+      player._reviving=true;player._stallFrames=0;
+      const done=()=>{player._reviving=false;};
+      rebuildAudio().then(done,done);
+      return;
+    }
+  }else{player._stallFrames=0;player._lastCtxTime=ac.currentTime;}
   for(let i=player.scheduled;i<player.notes.length;i++){
     const n=player.notes[i];
     if(n.start<pos-0.05){player.scheduled=i+1;continue;}
@@ -3578,6 +3635,10 @@ wirePlayer();
 document.querySelectorAll('.panel.collapsible>h2[data-collapse]').forEach(h=>{
   h.addEventListener('click',()=>h.parentElement.classList.toggle('closed'));
 });
+// Create our AudioContext FIRST so Tone is pointed at it before the sampler is built —
+// otherwise the sampler lands on Tone's own context and we're back to two contexts that can
+// die independently on sleep. (Created suspended; the first tap resumes it, as iOS requires.)
+audio();
 // start loading the real grand piano samples in the background
 if(window.Tone)initPiano();
 // reflect restored transport settings in UI
