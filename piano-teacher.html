@@ -1486,10 +1486,10 @@ function buildAudioGraph(){
   AC=new(window.AudioContext||window.webkitAudioContext)();
   const comp=AC.createDynamicsCompressor();master=AC.createGain();master.gain.value=.9;
   master.connect(comp);comp.connect(AC.destination);
-  // Tone shares OUR context so there's only ONE thing that can die on sleep (and only one
-  // thing to revive). Without this, the sampler lived on Tone's private context and the synth
-  // on ours — either could be dead independently, which made the sleep bug hard to kill.
-  try{ if(window.Tone&&Tone.setContext)Tone.setContext(AC); }catch(e){}
+  // NOTE: do NOT call Tone.setContext(AC) here. Tone.Destination is a singleton bound to the
+  // context that existed when Tone loaded; setContext() repoints Tone.context but leaves
+  // Destination on the OLD context, so sampler.chain(...,Tone.Destination) then feeds a graph
+  // with no audible output — i.e. total silence. Tone keeps its own context; we revive both.
   return AC;
 }
 function audio(){if(AC)return AC;return buildAudioGraph();}
@@ -1497,24 +1497,37 @@ function audio(){if(AC)return AC;return buildAudioGraph();}
 // 'interrupted'/'suspended' and resume() never succeeds, so there is NOTHING to un-stick —
 // which is why the app needed a full reload. The only reliable cure is to throw the dead
 // context away and build a fresh one, then reload the sampler onto it.
-function audioIsDead(){ return !AC || AC.state==='closed' || AC.state==='interrupted'; }
+function ctxDead(s){ return !s || s==='closed' || s==='interrupted'; }
+function audioIsDead(){ return ctxDead(AC&&AC.state); }
+// Tone runs on its OWN context (see buildAudioGraph), so it can be wedged independently.
+function toneIsDead(){ try{ return !!(window.Tone&&Tone.context&&ctxDead(Tone.context.state)); }catch(e){ return false; } }
 let _rebuilding=false;
 function rebuildAudio(){
   if(_rebuilding)return Promise.resolve();
   _rebuilding=true;
-  const old=AC;
-  try{ if(old&&old.state!=='closed')old.close(); }catch(e){}
-  synBus=null;                       // synth bus belonged to the dead context
-  piano.sampler=null;piano.ready=false;piano.loading=false;piano.fx=null; // so initPiano() rebuilds
-  AC=null;master=null;
-  const ac=buildAudioGraph();
+  // --- our raw context (synth path + master) ---
+  if(audioIsDead()){
+    try{ if(AC&&AC.state!=='closed')AC.close(); }catch(e){}
+    synBus=null;                     // synth bus belonged to the dead context
+    AC=null;master=null;
+    const ac=buildAudioGraph();
+    // Kick a resume but DON'T await it: on a fresh context outside a user gesture the promise
+    // can hang forever, and awaiting it would pin _rebuilding=true and block every later retry.
+    try{ Promise.resolve(ac.resume()).catch(()=>{}); }catch(e){}
+  }
+  // --- Tone's context (sampler path). Only tear the sampler down if Tone's context is really
+  // dead; otherwise we'd re-download ~20MB of samples for nothing (and risk silence meanwhile).
+  if(toneIsDead()){
+    piano.sampler=null;piano.ready=false;piano.loading=false;piano.fx=null;
+    try{ Tone.start().catch(()=>{}); }catch(e){}
+    try{ initPiano(); }catch(e){}
+  }else{
+    try{ if(window.Tone&&Tone.context&&Tone.context.state!=='running')Tone.start().catch(()=>{}); }catch(e){}
+  }
   setPlaybackSession();
-  // Kick a resume but DON'T await it: on a fresh context outside a user gesture the promise
-  // can hang forever, and awaiting it would pin _rebuilding=true and block every later retry.
-  try{ Promise.resolve(ac.resume()).catch(()=>{}); }catch(e){}
-  try{ if(window.Tone)initPiano(); }catch(e){}     // reload samples onto the new context
+  ensureAudible();                   // a rebuild must never leave the output ducked
   _rebuilding=false;
-  return Promise.resolve(ac);
+  return Promise.resolve(AC);
 }
 
 // ---- Synth fallback tone bus ----
@@ -1565,7 +1578,7 @@ function refreshSynthBus(){
 // but the iPad speaker was silent). Declaring a 'playback' session routes to the speaker and
 // ignores the silent switch. Safari 16.4+; harmless/no-op elsewhere.
 function setPlaybackSession(){try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback';}catch(e){}}
-function unlock(){setPlaybackSession();const ac=audio();if(ac.state==='suspended')ac.resume();if(window.Tone&&Tone.context&&Tone.context.state!=='running'){Tone.start().catch(()=>{});}}
+function unlock(){setPlaybackSession();const ac=audio();if(ac.state==='suspended')ac.resume();if(window.Tone&&Tone.context&&Tone.context.state!=='running'){Tone.start().catch(()=>{});}if(typeof ensureAudible==='function')ensureAudible();}
 
 /* ---------------------------------------------------------
    REAL GRAND PIANO — Salamander samples via Tone.Sampler.
@@ -3256,6 +3269,7 @@ function plPlay(){
     player.startClock=nowClock();player.playing=true;
     player.scheduled=0;player.metroScheduled=0; // reschedule audio + clicks from current pos
     $('plPlay').textContent='⏸';$('plPlay').classList.add('on');
+    ensureAudible();                            // never start playback into a ducked output
     resumeSounding(player.posAtStart);          // re-voice notes we cut mid-ring on pause
     acquireWakeLock();                          // hold the screen on while playing/looping
     cancelAnimationFrame(player.raf);player.raf=requestAnimationFrame(playerLoop);
@@ -3298,11 +3312,26 @@ function stopAllAudio(hard){
   if(!hard)return;
   // Hard cut: duck both output paths to silence immediately, then restore so the next
   // play/seek is at full level. A tiny ramp (5ms) instead of a step avoids a click.
-  try{ if(master){const t=AC.currentTime;master.gain.cancelScheduledValues(t);
-    master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0.0001,t+0.005);
-    master.gain.setValueAtTime(0.9,t+0.06);} }catch(e){}
-  try{ if(window.Tone&&Tone.Destination){const T=Tone.now();const v=Tone.Destination.volume;
-    v.cancelScheduledValues(T);v.setValueAtTime(-60,T+0.005);v.setValueAtTime(0,T+0.06);} }catch(e){}
+  // CRITICAL: the RESTORE must not be scheduled on the audio clock. If the context stalls or
+  // suspends in between (iPad sleep, or a suspended context to begin with), an audio-clock
+  // restore never fires and the app is muted for good. setTimeout runs off the wall clock, and
+  // we write .value directly so it lands even while the context is suspended.
+  try{ if(master&&AC){const t=AC.currentTime;master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value,t);master.gain.linearRampToValueAtTime(0.0001,t+0.005);} }catch(e){}
+  try{ if(window.Tone&&Tone.Destination){const v=Tone.Destination.volume;
+    v.cancelScheduledValues(Tone.now());v.value=-60;} }catch(e){}
+  setTimeout(()=>{
+    try{ if(master){master.gain.cancelScheduledValues(AC?AC.currentTime:0);master.gain.value=0.9;} }catch(e){}
+    try{ if(window.Tone&&Tone.Destination){const v=Tone.Destination.volume;v.cancelScheduledValues(Tone.now());v.value=0;} }catch(e){}
+  },70);
+}
+// Belt-and-braces: force both output paths back to full level. Any code path that ducked the
+// output (hard pause) and then hit a stalled/suspended clock could otherwise leave the app
+// silently muted, which is indistinguishable from "audio is broken". Called on every play.
+function ensureAudible(){
+  try{ if(master){master.gain.cancelScheduledValues(AC?AC.currentTime:0);master.gain.value=0.9;} }catch(e){}
+  try{ if(window.Tone&&Tone.Destination){const v=Tone.Destination.volume;v.cancelScheduledValues(Tone.now());v.value=0;
+    if(Tone.Destination.mute)Tone.Destination.mute=false;} }catch(e){}
 }
 function plPause(){player.posAtStart=playerPos();player.playing=false;$('plPlay').textContent='▶';$('plPlay').classList.remove('on');clearLitAll();stopAllAudio(true);releaseWakeLock();}
 // Pause hard-cuts the audio, so any note that was mid-ring is gone. On resume, re-strike
@@ -3407,30 +3436,37 @@ function nextPedalLift(start){
 }
 function scheduleAudio(pos){
   if(!player.sound)return;const ac=audio();const look=pos+0.2; // schedule 200ms ahead
-  // If iOS left the context suspended/interrupted (post-sleep), don't burn through notes —
-  // they'd be marked scheduled and never sound. Revive it and skip this frame; the visual
-  // waterfall keeps running off the wall clock either way. A context stuck 'interrupted' can
-  // never be resumed, so that case gets a full rebuild instead of a doomed resume() retry —
-  // otherwise you get exactly this bug: keys fall, no sound, only a reload fixes it.
-  if(ac.state!=='running'){
+  // Post-sleep recovery. Kick a repair when EITHER context is unhealthy (the sampler lives on
+  // Tone's context, the synth on ours), but do NOT gate note scheduling on our raw context —
+  // an earlier version returned here and produced the "keys fall, no sound" bug whenever the
+  // synth context lagged, even though the sampler was perfectly alive.
+  const acBad=ac.state!=='running', toneBad=(function(){try{return !!(window.Tone&&Tone.context&&Tone.context.state!=='running');}catch(e){return false;}})();
+  if(acBad||toneBad){
     if(!player._reviving){player._reviving=true;
       const done=()=>{player._reviving=false;};
-      if(audioIsDead())rebuildAudio().then(done,done);
-      else Promise.resolve(ac.resume()).catch(()=>{}).then(done,done);
+      if(audioIsDead()||toneIsDead())rebuildAudio().then(done,done);
+      else{const ps=[];
+        if(acBad)ps.push(Promise.resolve(ac.resume()).catch(()=>{}));
+        if(toneBad)ps.push(Promise.resolve(Tone.start()).catch(()=>{}));
+        Promise.all(ps).then(done,done);setTimeout(done,600);   // never latch _reviving
+      }
     }
-    return; }
+    // Only skip this frame if BOTH paths are unusable; otherwise let the live one sound.
+    if(acBad&&toneBad)return;
+  }
   // Nastiest iOS case: state SAYS 'running' but the clock is actually frozen, so every note
   // gets scheduled at a time that never arrives (silence, with the waterfall still moving).
-  // Watch currentTime across frames; if it hasn't moved while we're playing, rebuild.
-  if(player._lastCtxTime===ac.currentTime){
-    player._stallFrames=(player._stallFrames||0)+1;
-    if(player._stallFrames>30&&!player._reviving){   // ~0.5s of frames with a dead clock
-      player._reviving=true;player._stallFrames=0;
-      const done=()=>{player._reviving=false;};
-      rebuildAudio().then(done,done);
-      return;
-    }
-  }else{player._stallFrames=0;player._lastCtxTime=ac.currentTime;}
+  // Only meaningful while playing; ~1s of frames with a truly stuck clock triggers a rebuild.
+  if(player.playing&&ac.state==='running'){
+    if(player._lastCtxTime===ac.currentTime){
+      player._stallFrames=(player._stallFrames||0)+1;
+      if(player._stallFrames>60&&!player._reviving){
+        player._reviving=true;player._stallFrames=0;
+        const done=()=>{player._reviving=false;};
+        rebuildAudio().then(done,done);
+      }
+    }else{player._stallFrames=0;player._lastCtxTime=ac.currentTime;}
+  }
   for(let i=player.scheduled;i<player.notes.length;i++){
     const n=player.notes[i];
     if(n.start<pos-0.05){player.scheduled=i+1;continue;}
